@@ -16,11 +16,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
       </head>
       <body>
-        <div style={{ display: 'flex', minHeight: '100vh' }}>
+        <div style={{display:'flex',minHeight:'100vh'}}>
           <NavClient />
-          <main style={{ flex: 1, padding: 32, overflowY: 'auto' }}>
-            {children}
-          </main>
+          <main style={{flex:1,padding:32,overflowY:'auto'}}>{children}</main>
         </div>
       </body>
     </html>
