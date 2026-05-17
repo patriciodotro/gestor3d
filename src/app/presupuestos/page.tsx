@@ -312,7 +312,7 @@ export default function PresupuestosPage() {
   }
 
   function enviarWhatsApp(p: Presupuesto) {
-    const texto = `Hola! Te paso el presupuesto P-${String(p.numero).padStart('5', '0' as unknown as number)}:\n*${p.cliente_nombre}*\nTotal: ${fmt(p.precio_venta)}\n${p.fecha_entrega ? `Entrega estimada: ${p.fecha_entrega}` : ''}\n${p.notas || ''}`
+    const texto = `Hola! Te paso el presupuesto P-${String(p.numero).padStart(5, '0')}:\n*${p.cliente_nombre}*\nTotal: ${fmt(p.precio_venta)}\n${p.fecha_entrega ? `Entrega estimada: ${p.fecha_entrega}` : ''}\n${p.notas || ''}`
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank')
   }
 
