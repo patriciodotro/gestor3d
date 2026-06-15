@@ -485,6 +485,22 @@ export default function FilamentosPage() {
             <div className="flex items-center justify-center h-48 text-gray-400">Cargando maestros…</div>
           ) : (
             <>
+              {/* Ocupación por estante - PRIMERO */}
+              <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Ocupación por estante</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {(maestrosMap.estantes ?? []).map(estante => {
+                    const count = filamentos.filter(f => f.estante === estante).length
+                    return (
+                      <div key={estante} className="text-center p-3 bg-gray-50 rounded-lg">
+                        <p className="text-2xl font-bold text-gray-800">{count}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{estante}</p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {CATEGORIAS.map(({ key, label }) => {
                   const items = maestrosRaw.filter(m => m.categoria === key)
@@ -555,22 +571,6 @@ export default function FilamentosPage() {
                     </div>
                   )
                 })}
-              </div>
-
-              {/* Ocupación por estante */}
-              <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Ocupación por estante</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  {(maestrosMap.estantes ?? []).map(estante => {
-                    const count = filamentos.filter(f => f.estante === estante).length
-                    return (
-                      <div key={estante} className="text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="text-2xl font-bold text-gray-800">{count}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{estante}</p>
-                      </div>
-                    )
-                  })}
-                </div>
               </div>
 
               {/* Posiciones */}
