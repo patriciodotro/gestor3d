@@ -21,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <Link href="/" className="nav-link"><span>▦</span> Panel</Link>
             <Link href="/presupuestos" className="nav-link"><span>◈</span> Presupuestos</Link>
             <Link href="/insumos" className="nav-link"><span>◉</span> Insumos</Link>
+            <Link href="/inventario/filamentos" className="nav-link"><span>🧵</span> Filamentos</Link>
           </aside>
           <main style={{flex:1,padding:32,overflowY:'auto'}}>{children}</main>
         </div>
