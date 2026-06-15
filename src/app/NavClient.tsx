@@ -5,9 +5,10 @@ import { usePathname } from 'next/navigation'
 export default function NavClient() {
   const pathname = usePathname()
   const links = [
-    { href: '/', label: 'Panel', icon: '▦' },
-    { href: '/presupuestos', label: 'Presupuestos', icon: '◈' },
-    { href: '/insumos', label: 'Insumos', icon: '◉' },
+  { href: '/', label: 'Panel', icon: '☰' },
+  { href: '/presupuestos', label: 'Presupuestos', icon: '◈' },
+  { href: '/insumos', label: 'Insumos', icon: '◉' },
+  { href: '/inventario/filamentos', label: 'Filamentos', icon: '🧵' },
   ]
   return (
     <aside style={{width:220,background:'#fff',borderRight:'1px solid #e5e5e0',padding:'24px 16px',display:'flex',flexDirection:'column',gap:4,flexShrink:0}}>
