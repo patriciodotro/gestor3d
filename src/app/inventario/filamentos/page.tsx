@@ -488,11 +488,11 @@ export default function FilamentosPage() {
               {/* Ocupación por estante - PRIMERO */}
               <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
                 <h3 className="text-sm font-semibold text-gray-700 mb-3">Ocupación por estante</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="flex gap-4">
                   {(maestrosMap.estantes ?? []).map(estante => {
                     const count = filamentos.filter(f => f.estante === estante).length
                     return (
-                      <div key={estante} className="text-center p-3 bg-gray-50 rounded-lg">
+                      <div key={estante} className="flex-1 text-center p-3 bg-gray-50 rounded-lg">
                         <p className="text-2xl font-bold text-gray-800">{count}</p>
                         <p className="text-xs text-gray-500 mt-0.5">{estante}</p>
                       </div>
