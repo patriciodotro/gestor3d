@@ -9,6 +9,7 @@ export default function NavClient() {
   { href: '/presupuestos', label: 'Presupuestos', icon: '◈' },
   { href: '/insumos', label: 'Insumos', icon: '◉' },
   { href: '/inventario/filamentos', label: 'Filamentos', icon: '🧵' },
+  { href: '/calculadora', label: 'Calculadora', icon: '🧮' }, 
   ]
   return (
     <aside style={{width:220,background:'#fff',borderRight:'1px solid #e5e5e0',padding:'24px 16px',display:'flex',flexDirection:'column',gap:4,flexShrink:0}}>
