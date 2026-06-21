@@ -40,19 +40,19 @@ function Section({ title, icon, children, defaultOpen = true }: {
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div style={{ background: '#fff', border: '1px solid #e8e8e2', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
+    <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, marginBottom: 12, overflow: 'hidden' }}>
       <button onClick={() => setOpen(o => !o)} style={{
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '13px 18px', background: 'none', border: 'none', cursor: 'pointer',
-        fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: '#1a1a18',
+        fontFamily: 'inherit', fontSize: 13, fontWeight: 600, color: 'var(--color-text)',
       }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 16 }}>{icon}</span>{title}
         </span>
-        <span style={{ fontSize: 11, color: '#999', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+        <span style={{ fontSize: 11, color: 'var(--color-muted)', display: 'inline-block', transform: open ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
       </button>
       {open && (
-        <div style={{ padding: '0 18px 16px', borderTop: '1px solid #f0f0ec' }}>
+        <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--color-border)' }}>
           {children}
         </div>
       )}
@@ -67,12 +67,12 @@ function Field({ label, value, onChange, suffix, prefix, step = 1, min = 0 }: {
   return (
     <div>
       <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>{label}</label>
-      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid #e0e0da', borderRadius: 8, background: '#fafaf8', overflow: 'hidden' }}>
-        {prefix && <span style={{ padding: '0 10px', color: '#999', fontSize: 12, borderRight: '1px solid #e0e0da', background: '#f5f5f0' }}>{prefix}</span>}
+      <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', overflow: 'hidden' }}>
+        {prefix && <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderRight: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>{prefix}</span>}
         <input type="number" min={min} step={step} value={value}
           onChange={e => onChange(Number(e.target.value))}
-          style={{ flex: 1, padding: '8px 10px', border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: '#1a1a18', outline: 'none', width: 0 }} />
-        {suffix && <span style={{ padding: '0 10px', color: '#999', fontSize: 12, borderLeft: '1px solid #e0e0da', background: '#f5f5f0' }}>{suffix}</span>}
+          style={{ flex: 1, padding: '8px 10px', border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: 'var(--color-text)', outline: 'none', width: 0 }} />
+        {suffix && <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderLeft: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>{suffix}</span>}
       </div>
     </div>
   )
@@ -83,10 +83,10 @@ function CostBar({ label, value, pct, color }: { label: string; value: number; p
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 12, color: '#ccc' }}>{label}</span>
+        <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>{label}</span>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           <span style={{ fontSize: 12, color: '#fff', fontWeight: 500 }}>{$$(value)}</span>
-          <span style={{ fontSize: 11, color: '#666', minWidth: 32, textAlign: 'right' as const }}>{pct.toFixed(0)}%</span>
+          <span style={{ fontSize: 11, color: 'var(--color-muted-2)', minWidth: 32, textAlign: 'right' as const }}>{pct.toFixed(0)}%</span>
         </div>
       </div>
       <div style={{ height: 4, background: '#2a2a28', borderRadius: 2, overflow: 'hidden' }}>
@@ -105,7 +105,7 @@ function PriceCard({ label, mult, costoBase, accent, sublabel }: {
   const pctGanancia = precio > 0 ? (ganancia / precio) * 100 : 0
   return (
     <div style={{ background: '#2a2a28', borderRadius: 10, padding: '12px 14px', border: `1px solid ${accent}30` }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: '#666', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-muted-2)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 10, color: '#555', marginBottom: 8 }}>{sublabel}</div>
       <div style={{ fontSize: 20, fontWeight: 800, color: accent, marginBottom: 6 }}>{$$(precio)}</div>
       <div style={{ fontSize: 11, color: '#888' }}>
@@ -163,7 +163,7 @@ export default function CalculadoraPage() {
       {/* ══ IZQUIERDA ══ */}
       <div>
         <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: '#1a1a18', margin: 0 }}>Calculadora FDM</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Calculadora FDM</h1>
           <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Calculá el costo real de tu impresión</p>
         </div>
 
@@ -183,10 +183,10 @@ export default function CalculadoraPage() {
             <Field label="Precio por kg" value={config.precio_kg} onChange={v => setC('precio_kg', v)} prefix="$" step={500} />
             <Field label="Desperdicio / fallas" value={config.desperdicio_pct} onChange={v => setC('desperdicio_pct', v)} suffix="%" />
           </div>
-          <div style={{ marginTop: 10, padding: '8px 12px', background: '#f8f8f4', borderRadius: 8, fontSize: 12, color: '#666' }}>
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
             Filamento c/desperdicio: <strong>{gramosConDesperdicio.toFixed(1)}g</strong> → <strong>{$$(costoFilamento)}</strong>
           </div>
-          <p style={{ fontSize: 11, color: '#aaa', marginTop: 6 }}>El precio/kg se guarda automáticamente.</p>
+          <p style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>El precio/kg se guarda automáticamente.</p>
         </Section>
 
         {/* ELECTRICIDAD */}
@@ -195,7 +195,7 @@ export default function CalculadoraPage() {
             <Field label="Precio kWh" value={config.precio_kwh} onChange={v => setC('precio_kwh', v)} prefix="$" step={10} />
             <Field label="Consumo de la impresora" value={config.consumo_w} onChange={v => setC('consumo_w', v)} suffix="W" />
           </div>
-          <div style={{ marginTop: 10, padding: '8px 12px', background: '#f8f8f4', borderRadius: 8, fontSize: 12, color: '#666' }}>
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
             {tiempoHs.toFixed(1)}hs × {(config.consumo_w/1000).toFixed(3)}kW × ${config.precio_kwh}/kWh = <strong>{$$(costoElectricidad)}</strong>
           </div>
         </Section>
@@ -206,7 +206,7 @@ export default function CalculadoraPage() {
             <Field label="Costo de la impresora" value={config.costo_impresora} onChange={v => setC('costo_impresora', v)} prefix="$" step={10000} />
             <Field label="Vida útil estimada" value={config.vida_util_hs} onChange={v => setC('vida_util_hs', v)} suffix="hs" step={100} />
           </div>
-          <div style={{ marginTop: 10, padding: '8px 12px', background: '#f8f8f4', borderRadius: 8, fontSize: 12, color: '#666' }}>
+          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
             ${(config.costo_impresora / config.vida_util_hs).toFixed(1)}/hs × {tiempoHs.toFixed(1)}hs = <strong>{$$(costoAmortizacion)}</strong>
           </div>
         </Section>
@@ -214,7 +214,7 @@ export default function CalculadoraPage() {
         {/* INSUMOS */}
         <Section title="Insumos" icon="📦" defaultOpen={false}>
           {insumos.length === 0 ? (
-            <p style={{ fontSize: 12, color: '#aaa', marginTop: 12 }}>No hay insumos cargados. Agregá desde la sección Insumos.</p>
+            <p style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 12 }}>No hay insumos cargados. Agregá desde la sección Insumos.</p>
           ) : (
             <>
               <div style={{ marginTop: 12, marginBottom: 8, fontSize: 12, color: '#888' }}>
@@ -225,21 +225,21 @@ export default function CalculadoraPage() {
                 if (!items.length) return null
                 return (
                   <div key={cat} style={{ marginBottom: 14 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#aaa', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: 8 }}>
                       {CAT[cat]}
                     </div>
                     {items.map(ins => (
-                      <div key={ins.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid #f5f5f0' }}>
+                      <div key={ins.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: '1px solid var(--color-border)' }}>
                         <button
                           onClick={() => setInsumos(prev => prev.map(i => i.id === ins.id ? { ...i, activo: !i.activo } : i))}
                           style={{ width: 38, height: 22, borderRadius: 11, border: 'none', cursor: 'pointer', flexShrink: 0, background: ins.activo ? '#16a34a' : '#d0d0c8', position: 'relative', transition: 'background 0.15s' }}>
                           <span style={{ position: 'absolute', width: 16, height: 16, background: '#fff', borderRadius: '50%', top: 3, left: ins.activo ? 19 : 3, transition: 'left 0.15s' }} />
                         </button>
                         <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 13, fontWeight: 500, color: ins.activo ? '#1a1a18' : '#aaa' }}>{ins.nombre}</div>
+                          <div style={{ fontSize: 13, fontWeight: 500, color: ins.activo ? 'var(--color-text)' : 'var(--color-muted)' }}>{ins.nombre}</div>
                           <div style={{ fontSize: 11, color: '#bbb' }}>{$$(ins.costo_por_pieza)} / pieza</div>
                         </div>
-                        <div style={{ fontSize: 12, color: ins.activo ? '#1a1a18' : '#ccc', fontWeight: ins.activo ? 600 : 400 }}>
+                        <div style={{ fontSize: 12, color: ins.activo ? 'var(--color-text)' : 'var(--color-muted)', fontWeight: ins.activo ? 600 : 400 }}>
                           {ins.activo ? $$(ins.costo_por_pieza * cantPiezas) : '—'}
                         </div>
                       </div>
@@ -247,7 +247,7 @@ export default function CalculadoraPage() {
                   </div>
                 )
               })}
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 13, paddingTop: 8, borderTop: '2px solid #e8e8e2' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600, fontSize: 13, paddingTop: 8, borderTop: '2px solid var(--color-border)' }}>
                 <span>Total insumos</span><span>{$$(costoInsumos)}</span>
               </div>
             </>
@@ -264,10 +264,10 @@ export default function CalculadoraPage() {
             <input type="range" min={0} max={50} step={1} value={config.margen_error_pct}
               onChange={e => setC('margen_error_pct', Number(e.target.value))}
               style={{ width: '100%', accentColor: '#16a34a' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#ccc', marginTop: 2 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: 'var(--color-muted-2)', marginTop: 2 }}>
               <span>0%</span><span>50%</span>
             </div>
-            <div style={{ marginTop: 10, padding: '8px 12px', background: '#f8f8f4', borderRadius: 8, fontSize: 12, color: '#666' }}>
+            <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
               Agrega <strong>{$$(margenAbs)}</strong> al subtotal como colchón.
             </div>
           </div>
