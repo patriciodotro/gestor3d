@@ -193,7 +193,8 @@ export default function CalculadoraPage() {
   const costoFilamento = (gramosConDesperdicio / 1000) * config.precio_kg
   const costoElectricidad = tiempoHs * (config.consumo_w / 1000) * config.precio_kwh
   const costoAmortizacion = config.vida_util_hs > 0 ? (config.costo_impresora / config.vida_util_hs) * tiempoHs : 0
-  const costoInsumos = insumos.filter(i => i.activo).reduce((s, i) => s + i.costo_por_pieza * cantPiezas, 0)
+  const costoInsumos = insumos.filter(i => i.activo).reduce((s, i) =>
+    s + (i.categoria === 'post_procesado' ? i.costo_por_pieza * cantPiezas : i.costo_por_pieza), 0)
   const subtotal = costoFilamento + costoElectricidad + costoAmortizacion + costoInsumos
   const margenAbs = subtotal * (config.margen_error_pct / 100)
   const costoBase = subtotal + margenAbs
@@ -293,7 +294,7 @@ export default function CalculadoraPage() {
           ) : (
             <>
               <div style={{ marginTop: 12, marginBottom: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-                Activá los que vas a usar · {cantPiezas} {cantPiezas === 1 ? 'pieza' : 'piezas'}
+                Activá los que vas a usar · Impresión y Packaging son por tirada · Post-procesado es por pieza ({cantPiezas})
               </div>
               {categorias.map(cat => {
                 const items = insumos.filter(i => i.categoria === cat)
@@ -312,10 +313,16 @@ export default function CalculadoraPage() {
                         </button>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: ins.activo ? 'var(--color-text)' : 'var(--color-muted)' }}>{ins.nombre}</div>
-                          <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{$$(ins.costo_por_pieza)} / pieza</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>
+                            {$$(ins.costo_por_pieza)} {cat === 'post_procesado' ? '/ pieza' : '/ tirada'}
+                          </div>
                         </div>
                         <div style={{ fontSize: 12, color: ins.activo ? 'var(--color-text)' : 'var(--color-muted)', fontWeight: ins.activo ? 600 : 400 }}>
-                          {ins.activo ? $$(ins.costo_por_pieza * cantPiezas) : '—'}
+                          {ins.activo
+                            ? (cat === 'post_procesado'
+                              ? $$(ins.costo_por_pieza * cantPiezas)
+                              : $$(ins.costo_por_pieza))
+                            : '—'}
                         </div>
                       </div>
                     ))}
