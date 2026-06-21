@@ -3,13 +3,38 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: #f8f8f6;
-  --color-surface: #ffffff;
-  --color-border: #e5e5e0;
-  --color-text: #1a1a18;
-  --color-muted: #6b6b65;
+  /* Fondo y superficies */
+  --color-bg: #0f0f0e;
+  --color-surface: #1a1a18;
+  --color-surface-2: #111110;
+  --color-surface-hover: #232320;
+  --color-border: #2a2a28;
+  --color-border-hover: #3a3a36;
+
+  /* Texto */
+  --color-text: #f5f5f0;
+  --color-muted: #9a9a92;
+  --color-muted-2: #6b6b65;
+
+  /* Marca */
   --color-brand: #16a34a;
-  --color-brand-light: #dcfce7;
+  --color-brand-light: #14291a;
+  --color-brand-hover: #15803d;
+
+  /* Acentos */
+  --color-accent-orange: #f97316;
+  --color-accent-orange-bg: #2a1d0f;
+  --color-accent-blue: #60a5fa;
+  --color-accent-blue-bg: #16223a;
+  --color-accent-yellow: #eab308;
+  --color-accent-yellow-bg: #2a2410;
+  --color-accent-purple: #a78bfa;
+  --color-accent-purple-bg: #221c3a;
+  --color-accent-red: #f87171;
+  --color-accent-red-bg: #2a1515;
+
+  /* Inputs */
+  --color-input-bg: #1f1f1c;
 }
 
 * { box-sizing: border-box; }
@@ -30,6 +55,12 @@ input:focus, select:focus, textarea:focus {
   border-color: var(--color-brand) !important;
 }
 
-::-webkit-scrollbar { width: 4px; height: 4px; }
+/* Autofill / date / number inputs en fondo oscuro */
+input[type="date"], input[type="number"] {
+  color-scheme: dark;
+}
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #d0d0c8; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: #3a3a36; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4a4a46; }
