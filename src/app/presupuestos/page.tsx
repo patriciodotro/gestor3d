@@ -6,10 +6,10 @@ import { supabase, type Presupuesto, type Cliente, type Producto, type Insumo, t
 const fmt = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 const ESTADO_LABELS: Record<string, { label: string; color: string; bg: string }> = {
-  borrador:  { label: 'Borrador',  color: '#6b6b65', bg: '#f0f0ec' },
-  enviado:   { label: 'Enviado',   color: '#185FA5', bg: '#E6F1FB' },
-  aceptado:  { label: 'Aceptado',  color: '#3B6D11', bg: '#EAF3DE' },
-  rechazado: { label: 'Rechazado', color: '#A32D2D', bg: '#FCEBEB' },
+  borrador:  { label: 'Borrador',  color: 'var(--color-muted)', bg: 'var(--color-surface-2)' },
+  enviado:   { label: 'Enviado',   color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-bg)' },
+  aceptado:  { label: 'Aceptado',  color: 'var(--color-brand)', bg: 'var(--color-brand-light)' },
+  rechazado: { label: 'Rechazado', color: 'var(--color-accent-red)', bg: 'var(--color-accent-red-bg)' },
 }
 
 const CAT_LABELS: Record<string, string> = {
@@ -26,7 +26,7 @@ const S = {
     fontSize: 14,
     border: '1px solid var(--color-border)',
     borderRadius: 8,
-    background: '#fafaf8',
+    background: 'var(--color-input-bg)',
     color: 'var(--color-text)',
     fontFamily: 'inherit',
   } as React.CSSProperties,
@@ -38,7 +38,7 @@ const S = {
     fontWeight: 500,
   } as React.CSSProperties,
   card: {
-    background: '#fff',
+    background: 'var(--color-surface)',
     border: '1px solid var(--color-border)',
     borderRadius: 12,
     padding: '16px 20px',
@@ -59,9 +59,9 @@ const S = {
     fontWeight: 500,
     cursor: 'pointer',
     fontFamily: 'inherit',
-    border: variant === 'primary' ? 'none' : variant === 'danger' ? '1px solid #FCEBEB' : '1px solid var(--color-border)',
-    background: variant === 'primary' ? 'var(--color-brand)' : variant === 'danger' ? '#FCEBEB' : variant === 'ghost' ? 'transparent' : '#fff',
-    color: variant === 'primary' ? '#fff' : variant === 'danger' ? '#A32D2D' : 'var(--color-text)',
+    border: variant === 'primary' ? 'none' : variant === 'danger' ? '1px solid var(--color-accent-red-bg)' : '1px solid var(--color-border)',
+    background: variant === 'primary' ? 'var(--color-brand)' : variant === 'danger' ? 'var(--color-accent-red-bg)' : variant === 'ghost' ? 'transparent' : 'transparent',
+    color: variant === 'primary' ? '#fff' : variant === 'danger' ? 'var(--color-accent-red)' : 'var(--color-text)',
   } as React.CSSProperties),
 }
 
@@ -77,7 +77,6 @@ type FormData = {
   notas: string
   modo: 'rapido' | 'calculadora'
   items: PresupuestoItem[]
-  // calculadora
   filamentos: PresupuestoFilamento[]
   horas_impresion: number
   minutos_impresion: number
@@ -125,7 +124,6 @@ function calcularPresupuesto(f: FormData) {
     const descuento = subtotal * (f.descuento_porcentaje / 100)
     return { costo_base: 0, precio_venta: subtotal - descuento }
   }
-  // calculadora
   const totalPiezas = f.items.reduce((s, i) => s + i.cantidad, 0) || 1
   const horas = f.horas_impresion + f.minutos_impresion / 60
   const costoEnergia = horas * (f.consumo_maquina_w / 1000) * f.precio_kwh
@@ -356,7 +354,7 @@ export default function PresupuestosPage() {
   if (vista === 'lista') return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600 }}>Presupuestos</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text)' }}>Presupuestos</h1>
         <button style={S.btn('primary')} onClick={abrirNuevo}>+ Nuevo presupuesto</button>
       </div>
 
@@ -387,7 +385,7 @@ export default function PresupuestosPage() {
               <span style={{ padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: est.bg, color: est.color }}>
                 {est.label}
               </span>
-              <span style={{ fontWeight: 600, fontSize: 15, flex: 1 }}>{p.cliente_nombre || '—'}</span>
+              <span style={{ fontWeight: 600, fontSize: 15, flex: 1, color: 'var(--color-text)' }}>{p.cliente_nombre || '—'}</span>
               {p.fecha_entrega && (
                 <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>
                   Entrega: {new Date(p.fecha_entrega).toLocaleDateString('es-AR')}
@@ -399,14 +397,14 @@ export default function PresupuestosPage() {
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button style={S.btn()} onClick={() => abrirEditar(p)}>✎ Editar</button>
               <button style={S.btn()} onClick={() => duplicar(p)}>⧉ Duplicar</button>
-              <button style={{ ...S.btn(), color: '#25D366', borderColor: '#b7f5cc' }} onClick={() => enviarWhatsApp(p)}>
+              <button style={{ ...S.btn(), color: '#25D366', borderColor: '#1c4a2e' }} onClick={() => enviarWhatsApp(p)}>
                 WA
               </button>
               {p.estado === 'borrador' && (
                 <button style={S.btn()} onClick={() => cambiarEstado(p.id, 'enviado')}>Marcar enviado</button>
               )}
               {p.estado === 'enviado' && (<>
-                <button style={{ ...S.btn(), color: '#3B6D11', borderColor: '#c0dd97' }} onClick={() => cambiarEstado(p.id, 'aceptado')}>✓ Aceptar</button>
+                <button style={{ ...S.btn(), color: 'var(--color-brand)', borderColor: 'var(--color-brand-light)' }} onClick={() => cambiarEstado(p.id, 'aceptado')}>✓ Aceptar</button>
                 <button style={S.btn('danger')} onClick={() => cambiarEstado(p.id, 'rechazado')}>✕ Rechazar</button>
               </>)}
             </div>
@@ -427,25 +425,25 @@ export default function PresupuestosPage() {
     <div style={{ maxWidth: 760 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <button style={S.btn()} onClick={() => setVista('lista')}>← Volver</button>
-        <h1 style={{ fontSize: 20, fontWeight: 600 }}>{editandoId ? 'Editar presupuesto' : 'Nuevo presupuesto'}</h1>
+        <h1 style={{ fontSize: 20, fontWeight: 600, color: 'var(--color-text)' }}>{editandoId ? 'Editar presupuesto' : 'Nuevo presupuesto'}</h1>
       </div>
 
       {/* Modo toggle */}
-      <div style={{ display: 'flex', gap: 0, background: '#f0f0ec', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 0, background: 'var(--color-surface-2)', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 20 }}>
         {(['rapido', 'calculadora'] as const).map(m => (
           <button key={m} onClick={() => setForm(f => f ? { ...f, modo: m } : f)} style={{
             padding: '6px 20px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer',
             fontFamily: 'inherit', border: 'none',
-            background: form.modo === m ? '#fff' : 'transparent',
+            background: form.modo === m ? 'var(--color-surface)' : 'transparent',
             color: form.modo === m ? 'var(--color-text)' : 'var(--color-muted)',
-            boxShadow: form.modo === m ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            boxShadow: form.modo === m ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
           }}>
             {m === 'rapido' ? '⚡ Rápido' : '🔢 Calculadora'}
           </button>
         ))}
       </div>
 
-      {error && <div style={{ background: '#FCEBEB', color: '#A32D2D', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{error}</div>}
+      {error && <div style={{ background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)', padding: '10px 14px', borderRadius: 8, marginBottom: 16, fontSize: 13 }}>{error}</div>}
 
       {/* Cliente */}
       <div style={S.card}>
@@ -456,12 +454,12 @@ export default function PresupuestosPage() {
             onChange={e => { setClienteSearch(e.target.value); setForm(f => f ? { ...f, cliente_nombre: e.target.value, cliente_id: '' } : f) }}
           />
           {clienteSearch && clientesFiltrados.length > 0 && (
-            <div style={{ position: 'absolute', zIndex: 10, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 8, width: '100%', marginTop: 2, overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', zIndex: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, width: '100%', marginTop: 2, overflow: 'hidden' }}>
               {clientesFiltrados.map(c => (
                 <div key={c.id} onClick={() => { setClienteSearch(c.nombre); setForm(f => f ? { ...f, cliente_nombre: c.nombre, cliente_id: c.id } : f) }}
-                  style={{ padding: '9px 12px', cursor: 'pointer', fontSize: 14, borderBottom: '1px solid var(--color-border)' }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f0fdf4')}
-                  onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+                  style={{ padding: '9px 12px', cursor: 'pointer', fontSize: 14, borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-brand-light)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface)')}
                 >
                   <strong>{c.nombre}</strong>
                   {c.telefono && <span style={{ color: 'var(--color-muted)', marginLeft: 8, fontSize: 12 }}>{c.telefono}</span>}
@@ -492,7 +490,6 @@ export default function PresupuestosPage() {
       <div style={S.card}>
         <div style={S.sectionTitle}>Productos e ítems</div>
 
-        {/* Buscador de productos */}
         <div style={{ marginBottom: 14 }}>
           <label style={S.label}>Agregar producto guardado</label>
           <div style={{ position: 'relative' }}>
@@ -502,22 +499,22 @@ export default function PresupuestosPage() {
               onBlur={() => setTimeout(() => setShowProdDropdown(false), 200)}
             />
             {showProdDropdown && prodSearch && prodsFiltrados.length > 0 && (
-              <div style={{ position: 'absolute', zIndex: 10, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 8, width: '100%', marginTop: 2, overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', zIndex: 10, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, width: '100%', marginTop: 2, overflow: 'hidden' }}>
                 {prodsFiltrados.map(pr => (
                   <div key={pr.id} onMouseDown={() => agregarProducto(pr)}
                     style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '9px 12px', cursor: 'pointer', borderBottom: '1px solid var(--color-border)' }}
-                    onMouseEnter={e => (e.currentTarget.style.background = '#f0fdf4')}
-                    onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-brand-light)')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'var(--color-surface)')}
                   >
                     <div>
-                      <strong style={{ fontSize: 14 }}>{pr.nombre}</strong>
+                      <strong style={{ fontSize: 14, color: 'var(--color-text)' }}>{pr.nombre}</strong>
                       <span style={{ fontSize: 12, color: 'var(--color-muted)', marginLeft: 8 }}>{pr.categoria}</span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontSize: 12, background: pr.stock > 0 ? '#EAF3DE' : '#FCEBEB', color: pr.stock > 0 ? '#3B6D11' : '#A32D2D', padding: '2px 8px', borderRadius: 6 }}>
+                      <span style={{ fontSize: 12, background: pr.stock > 0 ? 'var(--color-brand-light)' : 'var(--color-accent-red-bg)', color: pr.stock > 0 ? 'var(--color-brand)' : 'var(--color-accent-red)', padding: '2px 8px', borderRadius: 6 }}>
                         Stock: {pr.stock}
                       </span>
-                      <span style={{ fontWeight: 600, color: '#185FA5', fontSize: 14 }}>{fmt(pr.precio)}</span>
+                      <span style={{ fontWeight: 600, color: 'var(--color-accent-blue)', fontSize: 14 }}>{fmt(pr.precio)}</span>
                     </div>
                   </div>
                 ))}
@@ -526,14 +523,13 @@ export default function PresupuestosPage() {
           </div>
         </div>
 
-        {/* Lista de items */}
         <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: 12 }}>
           {form.items.map((item, idx) => (
             <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 110px 32px', gap: 8, alignItems: 'end', paddingBottom: 10, marginBottom: 10, borderBottom: '1px solid var(--color-border)' }}>
               <div>
                 <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 4, marginBottom: 4, display: 'inline-block',
-                  background: item.tipo === 'producto' ? '#E6F1FB' : '#f0f0ec',
-                  color: item.tipo === 'producto' ? '#185FA5' : '#6b6b65' }}>
+                  background: item.tipo === 'producto' ? 'var(--color-accent-blue-bg)' : 'var(--color-surface-2)',
+                  color: item.tipo === 'producto' ? 'var(--color-accent-blue)' : 'var(--color-muted)' }}>
                   {item.tipo === 'producto' ? 'Producto' : 'Personalizado'}
                 </span>
                 <input style={S.input} value={item.descripcion} placeholder="Descripción..."
@@ -565,7 +561,6 @@ export default function PresupuestosPage() {
 
       {/* CALCULADORA */}
       {form.modo === 'calculadora' && (<>
-        {/* Filamentos */}
         <div style={S.card}>
           <div style={S.sectionTitle}>Filamentos utilizados</div>
           {form.filamentos.map((fil, idx) => (
@@ -597,7 +592,6 @@ export default function PresupuestosPage() {
           </button>
         </div>
 
-        {/* Costos de máquina */}
         <div style={S.card}>
           <div style={S.sectionTitle}>Costos de máquina</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12 }}>
@@ -620,7 +614,6 @@ export default function PresupuestosPage() {
           </div>
         </div>
 
-        {/* Insumos */}
         <div style={S.card}>
           <div style={S.sectionTitle}>Insumos · costo por pieza × {totalPiezas} {totalPiezas === 1 ? 'pieza' : 'piezas'}</div>
           {insumosPorCat.map(cat => {
@@ -638,7 +631,7 @@ export default function PresupuestosPage() {
                   <div key={i.insumo_id} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 130px', gap: 10, alignItems: 'center', paddingBottom: 8, marginBottom: 8, borderBottom: '1px solid var(--color-border)' }}>
                     <button onClick={() => toggleInsumo(i.insumo_id)} style={{
                       width: 36, height: 20, borderRadius: 10, border: 'none', cursor: 'pointer',
-                      background: i.activo ? 'var(--color-brand)' : '#d0d0c8', position: 'relative', transition: 'background 0.15s',
+                      background: i.activo ? 'var(--color-brand)' : 'var(--color-border-hover)', position: 'relative', transition: 'background 0.15s',
                     }}>
                       <span style={{ position: 'absolute', width: 14, height: 14, background: '#fff', borderRadius: '50%', top: 3, left: i.activo ? 19 : 3, transition: 'left 0.15s' }} />
                     </button>
@@ -654,22 +647,21 @@ export default function PresupuestosPage() {
               </div>
             )
           })}
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 500, fontSize: 13, paddingTop: 4 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 500, fontSize: 13, paddingTop: 4, color: 'var(--color-text)' }}>
             <span>Subtotal insumos</span>
             <span>{fmt(form.insumos_usados.filter(i => i.activo).reduce((s, i) => s + i.costo_por_pieza * totalPiezas, 0))}</span>
           </div>
           <p style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4 }}>Se suma al costo base. El cliente no lo ve.</p>
         </div>
 
-        {/* Multiplicador */}
         <div style={S.card}>
           <div style={S.sectionTitle}>Multiplicador de precio</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
             <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>×1</span>
-            <input type="range" min={1} max={20} step={0.5} value={form.multiplicador} style={{ flex: 1 }}
+            <input type="range" min={1} max={20} step={0.5} value={form.multiplicador} style={{ flex: 1, accentColor: 'var(--color-brand)' }}
               onChange={e => setForm(f => f ? { ...f, multiplicador: Number(e.target.value) } : f)} />
             <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>×20</span>
-            <strong style={{ minWidth: 32, textAlign: 'right' }}>×{form.multiplicador}</strong>
+            <strong style={{ minWidth: 32, textAlign: 'right', color: 'var(--color-text)' }}>×{form.multiplicador}</strong>
           </div>
         </div>
       </>)}
@@ -684,12 +676,12 @@ export default function PresupuestosPage() {
         {form.descuento_porcentaje > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: 'var(--color-muted)', marginBottom: 4 }}>
             <span>Descuento ({form.descuento_porcentaje}%)</span>
-            <span style={{ color: '#3B6D11' }}>−{fmt(precio_venta * form.descuento_porcentaje / (100 - form.descuento_porcentaje))}</span>
+            <span style={{ color: 'var(--color-brand)' }}>−{fmt(precio_venta * form.descuento_porcentaje / (100 - form.descuento_porcentaje))}</span>
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontWeight: 600, fontSize: 15 }}>Total para el cliente</span>
-          <span style={{ fontWeight: 700, fontSize: 22 }}>{fmt(precio_venta)}</span>
+          <span style={{ fontWeight: 600, fontSize: 15, color: 'var(--color-text)' }}>Total para el cliente</span>
+          <span style={{ fontWeight: 700, fontSize: 22, color: 'var(--color-text)' }}>{fmt(precio_venta)}</span>
         </div>
       </div>
 
