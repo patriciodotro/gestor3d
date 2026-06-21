@@ -83,13 +83,35 @@ function Field({ label, value, onChange, suffix, prefix, step = 1, min = 0 }: {
   label: string; value: number; onChange: (v: number) => void
   suffix?: string; prefix?: string; step?: number; min?: number
 }) {
+  const [text, setText] = useState(String(value))
+
+  useEffect(() => {
+    // Sincroniza si el valor cambia desde afuera (ej: localStorage, reset)
+    if (Number(text) !== value) setText(String(value))
+  }, [value])
+
+  function handleChange(raw: string) {
+    setText(raw)
+    if (raw === '' || raw === '-') return // dejar vacío mientras edita, no forzar a 0
+    const n = Number(raw)
+    if (!isNaN(n)) onChange(n)
+  }
+
+  function handleBlur() {
+    if (text === '' || text === '-' || isNaN(Number(text))) {
+      setText(String(min))
+      onChange(min)
+    }
+  }
+
   return (
     <div>
       <label style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500, display: 'block', marginBottom: 4 }}>{label}</label>
       <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', overflow: 'hidden' }}>
         {prefix && <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderRight: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>{prefix}</span>}
-        <input type="number" min={min} step={step} value={value}
-          onChange={e => onChange(Number(e.target.value))}
+        <input type="number" min={min} step={step} value={text}
+          onChange={e => handleChange(e.target.value)}
+          onBlur={handleBlur}
           style={{ flex: 1, padding: '8px 10px', border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 14, color: 'var(--color-text)', outline: 'none', width: 0 }} />
         {suffix && <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderLeft: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>{suffix}</span>}
       </div>
