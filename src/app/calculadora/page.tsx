@@ -21,6 +21,10 @@ type Config = {
   costo_impresora: number
   vida_util_hs: number
   margen_error_pct: number
+  // margen personalizado
+  margen_modo: 'multiplicador' | 'porcentaje'
+  margen_multiplicador: number
+  margen_porcentaje: number
 }
 
 const CONFIG_KEY = 'calc3d_config_v1'
@@ -32,6 +36,9 @@ const DEFAULT_CONFIG: Config = {
   costo_impresora: 500000,
   vida_util_hs: 5000,
   margen_error_pct: 10,
+  margen_modo: 'multiplicador',
+  margen_multiplicador: 4,
+  margen_porcentaje: 75,
 }
 
 // ── Sección plegable ────────────────────────────────────
@@ -60,13 +67,25 @@ function Section({ title, icon, children, defaultOpen = true }: {
   )
 }
 
+// ── Subsección dentro de un desplegable (sin caja propia) ──
+function SubSection({ title, icon, children }: { title: string; icon: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 600, color: 'var(--color-muted)', marginBottom: 10, textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>
+        <span style={{ fontSize: 14 }}>{icon}</span>{title}
+      </div>
+      {children}
+    </div>
+  )
+}
+
 function Field({ label, value, onChange, suffix, prefix, step = 1, min = 0 }: {
   label: string; value: number; onChange: (v: number) => void
   suffix?: string; prefix?: string; step?: number; min?: number
 }) {
   return (
     <div>
-      <label style={{ fontSize: 11, color: '#888', fontWeight: 500, display: 'block', marginBottom: 4 }}>{label}</label>
+      <label style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500, display: 'block', marginBottom: 4 }}>{label}</label>
       <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', overflow: 'hidden' }}>
         {prefix && <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderRight: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>{prefix}</span>}
         <input type="number" min={min} step={step} value={value}
@@ -96,7 +115,7 @@ function CostBar({ label, value, pct, color }: { label: string; value: number; p
   )
 }
 
-// ── Tarjeta de precio ───────────────────────────────────
+// ── Tarjeta de precio (modo fijo: multiplicador) ────────
 function PriceCard({ label, mult, costoBase, accent, sublabel }: {
   label: string; mult: number; costoBase: number; accent: string; sublabel: string
 }) {
@@ -107,6 +126,78 @@ function PriceCard({ label, mult, costoBase, accent, sublabel }: {
     <div style={{ background: '#2a2a28', borderRadius: 10, padding: '12px 14px', border: `1px solid ${accent}30` }}>
       <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-muted-2)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>{label}</div>
       <div style={{ fontSize: 10, color: '#555', marginBottom: 8 }}>{sublabel}</div>
+      <div style={{ fontSize: 20, fontWeight: 800, color: accent, marginBottom: 6 }}>{$$(precio)}</div>
+      <div style={{ fontSize: 11, color: '#888' }}>
+        Ganancia: <span style={{ color: '#4ade80', fontWeight: 600 }}>{$$(ganancia)}</span>
+        <span style={{ color: '#555', marginLeft: 4 }}>({pctGanancia.toFixed(0)}%)</span>
+      </div>
+    </div>
+  )
+}
+
+// ── Tarjeta "Con margen" editable (multiplicador o %) ───
+function PriceCardCustom({
+  costoBase, accent, modo, multiplicador, porcentaje, onModoChange, onMultChange, onPctChange,
+}: {
+  costoBase: number; accent: string
+  modo: 'multiplicador' | 'porcentaje'
+  multiplicador: number; porcentaje: number
+  onModoChange: (m: 'multiplicador' | 'porcentaje') => void
+  onMultChange: (v: number) => void
+  onPctChange: (v: number) => void
+}) {
+  // precio según modo: multiplicador -> costoBase * mult
+  // porcentaje -> ganancia deseada = costoBase * (pct/100), precio = costoBase + ganancia
+  const precio = modo === 'multiplicador'
+    ? costoBase * multiplicador
+    : costoBase * (1 + porcentaje / 100)
+  const ganancia = precio - costoBase
+  const pctGanancia = precio > 0 ? (ganancia / precio) * 100 : 0
+
+  return (
+    <div style={{ background: '#2a2a28', borderRadius: 10, padding: '12px 14px', border: `1px solid ${accent}30`, gridColumn: '1 / -1' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div>
+          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-muted-2)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Con margen</div>
+          <div style={{ fontSize: 10, color: '#555' }}>Tu margen personalizado</div>
+        </div>
+        {/* Toggle modo */}
+        <div style={{ display: 'flex', background: '#1f1f1c', borderRadius: 7, padding: 2 }}>
+          {(['multiplicador', 'porcentaje'] as const).map(m => (
+            <button key={m} onClick={() => onModoChange(m)} style={{
+              padding: '4px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer',
+              background: modo === m ? accent : 'transparent',
+              color: modo === m ? '#1a1a18' : 'var(--color-muted)',
+              transition: 'background 0.15s',
+            }}>
+              {m === 'multiplicador' ? '×' : '%'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+        {modo === 'multiplicador' ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>×</span>
+            <input
+              type="number" min={1} step={0.1} value={multiplicador}
+              onChange={e => onMultChange(Number(e.target.value))}
+              style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-input-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit' }}
+            />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <input
+              type="number" min={0} step={1} value={porcentaje}
+              onChange={e => onPctChange(Number(e.target.value))}
+              style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-input-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit' }}
+            />
+            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>% de ganancia</span>
+          </div>
+        )}
+      </div>
+
       <div style={{ fontSize: 20, fontWeight: 800, color: accent, marginBottom: 6 }}>{$$(precio)}</div>
       <div style={{ fontSize: 11, color: '#888' }}>
         Ganancia: <span style={{ color: '#4ade80', fontWeight: 600 }}>{$$(ganancia)}</span>
@@ -128,7 +219,7 @@ export default function CalculadoraPage() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem(CONFIG_KEY)
-      if (saved) setConfig(JSON.parse(saved))
+      if (saved) setConfig(prev => ({ ...prev, ...JSON.parse(saved) }))
     } catch (_) {}
     supabase.from('insumos').select('*').order('categoria').then(({ data }) => {
       if (data) setInsumos(data.map((i: Insumo) => ({ ...i, activo: i.activo_por_defecto })))
@@ -140,7 +231,7 @@ export default function CalculadoraPage() {
     try { localStorage.setItem(CONFIG_KEY, JSON.stringify(newCfg)) } catch (_) {}
   }, [])
 
-  const setC = (key: keyof Config, val: number) => saveConfig({ ...config, [key]: val })
+  const setC = <K extends keyof Config>(key: K, val: Config[K]) => saveConfig({ ...config, [key]: val })
 
   const tiempoHs = horas + minutos / 60
   const gramosConDesperdicio = gramos * (1 + config.desperdicio_pct / 100)
@@ -158,15 +249,17 @@ export default function CalculadoraPage() {
   const categorias = ['impresion', 'post_procesado', 'packaging']
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, padding: 24, alignItems: 'start', maxWidth: 1080, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1080, margin: '0 auto', padding: 24 }}>
+      {/* Título a todo el ancho */}
+      <div style={{ marginBottom: 20 }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Calculadora FDM</h1>
+        <p style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 4 }}>Calculá el costo real de tu impresión</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 20, alignItems: 'start' }}>
 
       {/* ══ IZQUIERDA ══ */}
       <div>
-        <div style={{ marginBottom: 20 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Calculadora FDM</h1>
-          <p style={{ fontSize: 13, color: '#888', marginTop: 4 }}>Calculá el costo real de tu impresión</p>
-        </div>
-
         {/* IMPRESIÓN */}
         <Section title="Impresión" icon="🖨️">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginTop: 12 }}>
@@ -189,35 +282,13 @@ export default function CalculadoraPage() {
           <p style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>El precio/kg se guarda automáticamente.</p>
         </Section>
 
-        {/* ELECTRICIDAD */}
-        <Section title="Electricidad" icon="⚡" defaultOpen={false}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-            <Field label="Precio kWh" value={config.precio_kwh} onChange={v => setC('precio_kwh', v)} prefix="$" step={10} />
-            <Field label="Consumo de la impresora" value={config.consumo_w} onChange={v => setC('consumo_w', v)} suffix="W" />
-          </div>
-          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-            {tiempoHs.toFixed(1)}hs × {(config.consumo_w/1000).toFixed(3)}kW × ${config.precio_kwh}/kWh = <strong>{$$(costoElectricidad)}</strong>
-          </div>
-        </Section>
-
-        {/* AMORTIZACIÓN */}
-        <Section title="Amortización de impresora" icon="🔧" defaultOpen={false}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
-            <Field label="Costo de la impresora" value={config.costo_impresora} onChange={v => setC('costo_impresora', v)} prefix="$" step={10000} />
-            <Field label="Vida útil estimada" value={config.vida_util_hs} onChange={v => setC('vida_util_hs', v)} suffix="hs" step={100} />
-          </div>
-          <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-            ${(config.costo_impresora / config.vida_util_hs).toFixed(1)}/hs × {tiempoHs.toFixed(1)}hs = <strong>{$$(costoAmortizacion)}</strong>
-          </div>
-        </Section>
-
         {/* INSUMOS */}
         <Section title="Insumos" icon="📦" defaultOpen={false}>
           {insumos.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 12 }}>No hay insumos cargados. Agregá desde la sección Insumos.</p>
           ) : (
             <>
-              <div style={{ marginTop: 12, marginBottom: 8, fontSize: 12, color: '#888' }}>
+              <div style={{ marginTop: 12, marginBottom: 8, fontSize: 12, color: 'var(--color-muted)' }}>
                 Activá los que vas a usar · {cantPiezas} {cantPiezas === 1 ? 'pieza' : 'piezas'}
               </div>
               {categorias.map(cat => {
@@ -237,7 +308,7 @@ export default function CalculadoraPage() {
                         </button>
                         <div style={{ flex: 1 }}>
                           <div style={{ fontSize: 13, fontWeight: 500, color: ins.activo ? 'var(--color-text)' : 'var(--color-muted)' }}>{ins.nombre}</div>
-                          <div style={{ fontSize: 11, color: '#bbb' }}>{$$(ins.costo_por_pieza)} / pieza</div>
+                          <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>{$$(ins.costo_por_pieza)} / pieza</div>
                         </div>
                         <div style={{ fontSize: 12, color: ins.activo ? 'var(--color-text)' : 'var(--color-muted)', fontWeight: ins.activo ? 600 : 400 }}>
                           {ins.activo ? $$(ins.costo_por_pieza * cantPiezas) : '—'}
@@ -254,12 +325,32 @@ export default function CalculadoraPage() {
           )}
         </Section>
 
-        {/* MARGEN */}
-        <Section title="Margen de error / imprevistos" icon="⚠️" defaultOpen={false}>
-          <div style={{ marginTop: 12 }}>
+        {/* VARIABLES FIJAS — agrupa Electricidad + Amortización + Margen de error */}
+        <Section title="Variables fijas" icon="⚙️" defaultOpen={false}>
+          <SubSection title="Electricidad" icon="⚡">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Precio kWh" value={config.precio_kwh} onChange={v => setC('precio_kwh', v)} prefix="$" step={10} />
+              <Field label="Consumo de la impresora" value={config.consumo_w} onChange={v => setC('consumo_w', v)} suffix="W" />
+            </div>
+            <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
+              {tiempoHs.toFixed(1)}hs × {(config.consumo_w/1000).toFixed(3)}kW × ${config.precio_kwh}/kWh = <strong>{$$(costoElectricidad)}</strong>
+            </div>
+          </SubSection>
+
+          <SubSection title="Amortización de impresora" icon="🔧">
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <Field label="Costo de la impresora" value={config.costo_impresora} onChange={v => setC('costo_impresora', v)} prefix="$" step={10000} />
+              <Field label="Vida útil estimada" value={config.vida_util_hs} onChange={v => setC('vida_util_hs', v)} suffix="hs" step={100} />
+            </div>
+            <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
+              ${(config.costo_impresora / config.vida_util_hs).toFixed(1)}/hs × {tiempoHs.toFixed(1)}hs = <strong>{$$(costoAmortizacion)}</strong>
+            </div>
+          </SubSection>
+
+          <SubSection title="Margen de error / imprevistos" icon="⚠️">
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <label style={{ fontSize: 11, color: '#888', fontWeight: 500 }}>Colchón de imprevistos</label>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{config.margen_error_pct}%</span>
+              <label style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500 }}>Colchón de imprevistos</label>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)' }}>{config.margen_error_pct}%</span>
             </div>
             <input type="range" min={0} max={50} step={1} value={config.margen_error_pct}
               onChange={e => setC('margen_error_pct', Number(e.target.value))}
@@ -270,7 +361,7 @@ export default function CalculadoraPage() {
             <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
               Agrega <strong>{$$(margenAbs)}</strong> al subtotal como colchón.
             </div>
-          </div>
+          </SubSection>
         </Section>
       </div>
 
@@ -323,7 +414,16 @@ export default function CalculadoraPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
               <PriceCard label="Mínimo" sublabel="Solo para cubrir costos" mult={1.5} costoBase={costoBase} accent="#9ca3af" />
               <PriceCard label="Recomendado" sublabel="Margen saludable" mult={3} costoBase={costoBase} accent="#4ade80" />
-              <PriceCard label="Con margen" sublabel="Valor agregado" mult={4} costoBase={costoBase} accent="#fb923c" />
+              <PriceCardCustom
+                costoBase={costoBase}
+                accent="#fb923c"
+                modo={config.margen_modo}
+                multiplicador={config.margen_multiplicador}
+                porcentaje={config.margen_porcentaje}
+                onModoChange={m => setC('margen_modo', m)}
+                onMultChange={v => setC('margen_multiplicador', v)}
+                onPctChange={v => setC('margen_porcentaje', v)}
+              />
               <PriceCard label="Premium" sublabel="Alta complejidad" mult={6} costoBase={costoBase} accent="#60a5fa" />
             </div>
           </div>
@@ -332,6 +432,7 @@ export default function CalculadoraPage() {
             Los multiplicadores son orientativos. Ajustá según complejidad, diseño y mercado.
           </p>
         </div>
+      </div>
       </div>
     </div>
   )
