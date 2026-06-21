@@ -226,7 +226,7 @@ export default function CalculadoraPage() {
         </Section>
 
         {/* FILAMENTO */}
-        <Section title="Filamento" icon="🧵" defaultOpen={false}>
+        <Section title="Filamento" icon="🧵">
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12 }}>
             <Field label="Precio por kg" value={config.precio_kg} onChange={v => setC('precio_kg', v)} prefix="$" step={500} />
             <Field label="Desperdicio / fallas" value={config.desperdicio_pct} onChange={v => setC('desperdicio_pct', v)} suffix="%" />
@@ -235,6 +235,53 @@ export default function CalculadoraPage() {
             Filamento c/desperdicio: <strong>{gramosConDesperdicio.toFixed(1)}g</strong> → <strong>{$$(costoFilamento)}</strong>
           </div>
           <p style={{ fontSize: 11, color: 'var(--color-muted)', marginTop: 6 }}>El precio/kg se guarda automáticamente.</p>
+        </Section>
+
+        {/* MARGEN DE GANANCIA PERSONALIZADO */}
+        <Section title="Margen de ganancia" icon="💰">
+          <div style={{ marginTop: 12 }}>
+            {/* Toggle modo */}
+            <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 14 }}>
+              {(['multiplicador', 'porcentaje'] as const).map(m => (
+                <button key={m} onClick={() => setC('margen_modo', m)} style={{
+                  padding: '6px 18px', borderRadius: 6, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  background: config.margen_modo === m ? '#fb923c' : 'transparent',
+                  color: config.margen_modo === m ? '#1a1a18' : 'var(--color-muted)',
+                }}>
+                  {m === 'multiplicador' ? 'Multiplicador (×)' : 'Porcentaje (%)'}
+                </button>
+              ))}
+            </div>
+
+            {config.margen_modo === 'multiplicador' ? (
+              <>
+                <label style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500, display: 'block', marginBottom: 6 }}>Multiplicador rápido</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[2, 2.5, 3, 3.5].map(v => (
+                    <button key={v} onClick={() => setC('margen_multiplicador', v)} style={{
+                      flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      border: config.margen_multiplicador === v ? '1px solid #fb923c' : '1px solid var(--color-border)',
+                      background: config.margen_multiplicador === v ? '#fb923c20' : 'transparent',
+                      color: config.margen_multiplicador === v ? '#fb923c' : 'var(--color-text)',
+                    }}>
+                      ×{v}
+                    </button>
+                  ))}
+                </div>
+                <Field label="Multiplicador personalizado" value={config.margen_multiplicador} onChange={v => setC('margen_multiplicador', v)} prefix="×" step={0.1} min={1} />
+              </>
+            ) : (
+              <Field label="Porcentaje de ganancia deseado" value={config.margen_porcentaje} onChange={v => setC('margen_porcentaje', v)} suffix="%" step={5} />
+            )}
+
+            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
+              Precio final: <strong>
+                {config.margen_modo === 'multiplicador'
+                  ? $$(costoBase * config.margen_multiplicador)
+                  : $$(costoBase * (1 + config.margen_porcentaje / 100))}
+              </strong>
+            </div>
+          </div>
         </Section>
 
         {/* INSUMOS */}
@@ -318,53 +365,6 @@ export default function CalculadoraPage() {
             </div>
           </SubSection>
         </Section>
-
-        {/* MARGEN DE GANANCIA PERSONALIZADO */}
-        <Section title="Margen de ganancia" icon="💰" defaultOpen={false}>
-          <div style={{ marginTop: 12 }}>
-            {/* Toggle modo */}
-            <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 14 }}>
-              {(['multiplicador', 'porcentaje'] as const).map(m => (
-                <button key={m} onClick={() => setC('margen_modo', m)} style={{
-                  padding: '6px 18px', borderRadius: 6, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  background: config.margen_modo === m ? '#fb923c' : 'transparent',
-                  color: config.margen_modo === m ? '#1a1a18' : 'var(--color-muted)',
-                }}>
-                  {m === 'multiplicador' ? 'Multiplicador (×)' : 'Porcentaje (%)'}
-                </button>
-              ))}
-            </div>
-
-            {config.margen_modo === 'multiplicador' ? (
-              <>
-                <label style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500, display: 'block', marginBottom: 6 }}>Multiplicador rápido</label>
-                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
-                  {[2, 2.5, 3, 3.5].map(v => (
-                    <button key={v} onClick={() => setC('margen_multiplicador', v)} style={{
-                      flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
-                      border: config.margen_multiplicador === v ? '1px solid #fb923c' : '1px solid var(--color-border)',
-                      background: config.margen_multiplicador === v ? '#fb923c20' : 'transparent',
-                      color: config.margen_multiplicador === v ? '#fb923c' : 'var(--color-text)',
-                    }}>
-                      ×{v}
-                    </button>
-                  ))}
-                </div>
-                <Field label="Multiplicador personalizado" value={config.margen_multiplicador} onChange={v => setC('margen_multiplicador', v)} prefix="×" step={0.1} min={1} />
-              </>
-            ) : (
-              <Field label="Porcentaje de ganancia deseado" value={config.margen_porcentaje} onChange={v => setC('margen_porcentaje', v)} suffix="%" step={5} />
-            )}
-
-            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-              Precio final: <strong>
-                {config.margen_modo === 'multiplicador'
-                  ? $$(costoBase * config.margen_multiplicador)
-                  : $$(costoBase * (1 + config.margen_porcentaje / 100))}
-              </strong>
-            </div>
-          </div>
-        </Section>
       </div>
 
       {/* ══ DERECHA — RESULTADOS ══ */}
@@ -423,7 +423,7 @@ export default function CalculadoraPage() {
                 multiplicador={config.margen_multiplicador}
                 porcentaje={config.margen_porcentaje}
               />
-              <PriceCard label="Premium" sublabel="Alta complejidad" mult={6} costoBase={costoBase} accent="#60a5fa" />
+              <PriceCard label="Premium" sublabel="Alta complejidad" mult={4} costoBase={costoBase} accent="#60a5fa" />
             </div>
           </div>
 
@@ -504,6 +504,12 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
     if (!file) return
     setFotoFile(file)
     setFotoPreview(URL.createObjectURL(file))
+  }
+
+  function handleRemoveFoto() {
+    if (fotoPreview) URL.revokeObjectURL(fotoPreview)
+    setFotoFile(null)
+    setFotoPreview(null)
   }
 
   async function handleGuardar() {
@@ -609,7 +615,7 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
             <label style={labelStyle}>Foto del producto</label>
             <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
               {(['subir', 'url'] as const).map(m => (
-                <button key={m} onClick={() => setModoFoto(m)} style={{
+                <button key={m} onClick={() => { setModoFoto(m); if (m === 'url') handleRemoveFoto() }} style={{
                   padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer',
                   background: modoFoto === m ? 'var(--color-brand)' : 'transparent',
                   color: modoFoto === m ? '#fff' : 'var(--color-text)',
@@ -622,7 +628,18 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
               <>
                 <input type="file" accept="image/*" onChange={handleFileChange} style={{ fontSize: 13, color: 'var(--color-muted)' }} />
                 {fotoPreview && (
-                  <img src={fotoPreview} alt="preview" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, marginTop: 8 }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+                    <img src={fotoPreview} alt="preview" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
+                    <button
+                      onClick={handleRemoveFoto}
+                      style={{
+                        padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
+                        border: '1px solid var(--color-accent-red-bg)', background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)',
+                      }}
+                    >
+                      ✕ Quitar foto
+                    </button>
+                  </div>
                 )}
               </>
             ) : (
