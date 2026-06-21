@@ -44,19 +44,19 @@ const POSICIONES = [
 ]
 
 const NIVEL_COLOR: Record<string, string> = {
-  'Cerrado':      'bg-blue-100 text-blue-800',
-  'Lleno':        'bg-green-100 text-green-800',
-  'Tres cuartos': 'bg-emerald-100 text-emerald-800',
-  'Medio':        'bg-yellow-100 text-yellow-800',
-  'Poco':         'bg-red-100 text-red-800',
+  'Cerrado':      'bg-[#16223a] text-[#60a5fa]',
+  'Lleno':        'bg-[#14291a] text-[#4ade80]',
+  'Tres cuartos': 'bg-[#0f2a22] text-[#34d399]',
+  'Medio':        'bg-[#2a2410] text-[#eab308]',
+  'Poco':         'bg-[#2a1515] text-[#f87171]',
 }
 
 const NIVEL_DOT: Record<string, string> = {
-  'Cerrado':      'bg-blue-500',
-  'Lleno':        'bg-green-500',
+  'Cerrado':      'bg-[#16223a]0',
+  'Lleno':        'bg-[#14291a]0',
   'Tres cuartos': 'bg-emerald-400',
   'Medio':        'bg-yellow-400',
-  'Poco':         'bg-red-500',
+  'Poco':         'bg-[#2a1515]0',
 }
 
 const CATEGORIAS: { key: string; label: string }[] = [
@@ -261,7 +261,7 @@ export default function FilamentosPage() {
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="w-full text-sm border border-gray-300 rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+      className="w-full text-sm border border-[#2a2a28] rounded px-1 py-0.5 bg-[#1a1a18] focus:outline-none focus:ring-1 focus:ring-[#3b82f6]"
     >
       {options.map(o => <option key={o}>{o}</option>)}
     </select>
@@ -275,44 +275,44 @@ export default function FilamentosPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Filamentos</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <h1 className="text-2xl font-bold text-[#f5f5f0]">Filamentos</h1>
+          <p className="text-sm text-[#9a9a92] mt-0.5">
             {filamentos.length} bobinas en stock · {filtered.length} mostrando
-            {enUsoCount > 0 && <span className="ml-2 text-orange-500 font-medium">· {enUsoCount} en uso</span>}
+            {enUsoCount > 0 && <span className="ml-2 text-[#f97316] font-medium">· {enUsoCount} en uso</span>}
           </p>
         </div>
         <button
           onClick={() => { setShowAdd(true); setNewDraft(EMPTY_FILAMENTO(maestrosMap)) }}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           + Agregar filamento
         </button>
       </div>
 
       {/* Resumen niveles */}
-      <div className="flex flex-wrap items-center gap-4 mb-5 px-4 py-3 bg-gray-50 rounded-xl border border-gray-100">
-        <span className="text-sm font-medium text-gray-500">{filamentos.length} filamentos</span>
-        <div className="w-px h-4 bg-gray-200" />
+      <div className="flex flex-wrap items-center gap-4 mb-5 px-4 py-3 bg-[#111110] rounded-xl border border-[#232320]">
+        <span className="text-sm font-medium text-[#9a9a92]">{filamentos.length} filamentos</span>
+        <div className="w-px h-4 bg-[#2a2a28]" />
         {contadores.map(({ nivel, count }) => count > 0 && (
           <button
             key={nivel}
             onClick={() => setFilterNivel(filterNivel === nivel ? '' : nivel)}
             className={`flex items-center gap-1.5 text-sm transition-opacity ${filterNivel && filterNivel !== nivel ? 'opacity-40' : 'opacity-100'}`}
           >
-            <span className={`inline-block w-2.5 h-2.5 rounded-full ${NIVEL_DOT[nivel] ?? 'bg-gray-400'}`} />
-            <span className="font-semibold text-gray-800">{count}</span>
-            <span className="text-gray-500">{nivel}</span>
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${NIVEL_DOT[nivel] ?? 'bg-[#6b6b65]'}`} />
+            <span className="font-semibold text-[#f5f5f0]">{count}</span>
+            <span className="text-[#9a9a92]">{nivel}</span>
           </button>
         ))}
         {enUsoCount > 0 && (
           <>
-            <div className="w-px h-4 bg-gray-200" />
+            <div className="w-px h-4 bg-[#2a2a28]" />
             <button
               onClick={() => setFilterEnUso(!filterEnUso)}
-              className={`flex items-center gap-1.5 text-sm ${filterEnUso ? 'text-orange-600 font-semibold' : 'text-gray-500'}`}
+              className={`flex items-center gap-1.5 text-sm ${filterEnUso ? 'text-[#f97316] font-semibold' : 'text-[#9a9a92]'}`}
             >
               <span className="inline-block w-2.5 h-2.5 rounded-full bg-orange-400" />
-              <span className="font-semibold text-gray-800">{enUsoCount}</span>
+              <span className="font-semibold text-[#f5f5f0]">{enUsoCount}</span>
               <span>En uso</span>
             </button>
           </>
@@ -320,15 +320,15 @@ export default function FilamentosPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-6 border-b border-gray-200 mb-5">
+      <div className="flex gap-6 border-b border-[#2a2a28] mb-5">
         {(['filamentos', 'maestros'] as Tab[]).map(tab => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={`pb-2 text-sm font-medium capitalize transition-colors border-b-2 -mb-px ${
               activeTab === tab
-                ? 'border-green-500 text-green-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
+                ? 'border-[#16a34a] text-[#4ade80]'
+                : 'border-transparent text-[#9a9a92] hover:text-[#d4d4cf]'
             }`}
           >
             {tab === 'filamentos' ? 'Filamentos' : 'Maestros y ubicaciones'}
@@ -344,27 +344,27 @@ export default function FilamentosPage() {
             <input
               type="text" placeholder="Buscar…" value={search}
               onChange={e => setSearch(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 w-44"
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6] w-44"
             />
             <select value={filterMaterial} onChange={e => setFilterMaterial(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los materiales</option>
               {(maestrosMap.materiales ?? []).map(m => <option key={m}>{m}</option>)}
             </select>
             <select value={filterEstante} onChange={e => setFilterEstante(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los estantes</option>
               {(maestrosMap.estantes ?? []).map(e => <option key={e}>{e}</option>)}
             </select>
             <select value={filterNivel} onChange={e => setFilterNivel(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los niveles</option>
               {(maestrosMap.niveles ?? []).map(n => <option key={n}>{n}</option>)}
             </select>
             <button
               onClick={() => setFilterEnUso(!filterEnUso)}
               className={`flex items-center gap-1.5 border rounded-lg px-3 py-1.5 text-sm transition-colors ${
-                filterEnUso ? 'bg-orange-50 border-orange-300 text-orange-700 font-medium' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                filterEnUso ? 'bg-[#2a1d0f] border-[#f97316]/40 text-[#f97316] font-medium' : 'border-[#2a2a28] text-[#9a9a92] hover:bg-[#111110]'
               }`}
             >
               <span className="inline-block w-2 h-2 rounded-full bg-orange-400" /> En uso
@@ -372,38 +372,38 @@ export default function FilamentosPage() {
             {(search || filterMaterial || filterEstante || filterNivel || filterEnUso) && (
               <button
                 onClick={() => { setSearch(''); setFilterMaterial(''); setFilterEstante(''); setFilterNivel(''); setFilterEnUso(false) }}
-                className="text-sm text-gray-500 hover:text-gray-700 underline"
+                className="text-sm text-[#9a9a92] hover:text-[#d4d4cf] underline"
               >Limpiar</button>
             )}
           </div>
 
           {/* Tabla */}
           {loading ? (
-            <div className="flex items-center justify-center h-48 text-gray-400">Cargando…</div>
+            <div className="flex items-center justify-center h-48 text-[#6b6b65]">Cargando…</div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+            <div className="overflow-x-auto rounded-xl border border-[#2a2a28]">
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-[#111110] border-b border-[#2a2a28]">
                   <tr>
                     {([
                       ['posicion','Posición'],['estante','Estante'],['material','Material'],
                       ['tipo','Tipo'],['marca','Marca'],['color','Color'],['nivel','Nivel'],
                     ] as [SortKey, string][]).map(([key, label]) => (
                       <th key={key} onClick={() => handleSort(key)}
-                        className="text-left px-4 py-3 font-medium text-gray-600 cursor-pointer hover:text-gray-900 select-none whitespace-nowrap">
+                        className="text-left px-4 py-3 font-medium text-[#9a9a92] cursor-pointer hover:text-[#f5f5f0] select-none whitespace-nowrap">
                         {label}<SortIcon col={key} />
                       </th>
                     ))}
-                    <th className="px-4 py-3 text-center font-medium text-gray-600 whitespace-nowrap">En uso</th>
-                    <th className="px-4 py-3 text-right font-medium text-gray-600">Acciones</th>
+                    <th className="px-4 py-3 text-center font-medium text-[#9a9a92] whitespace-nowrap">En uso</th>
+                    <th className="px-4 py-3 text-right font-medium text-[#9a9a92]">Acciones</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-[#232320]">
                   {filtered.length === 0 && (
-                    <tr><td colSpan={9} className="text-center py-12 text-gray-400">No hay filamentos que coincidan.</td></tr>
+                    <tr><td colSpan={9} className="text-center py-12 text-[#6b6b65]">No hay filamentos que coincidan.</td></tr>
                   )}
                   {filtered.map(f => (
-                    <tr key={f.id} className={`transition-colors ${f.en_uso ? 'bg-orange-50 hover:bg-orange-100' : editingId === f.id ? 'bg-blue-50' : 'hover:bg-gray-50'}`}>
+                    <tr key={f.id} className={`transition-colors ${f.en_uso ? 'bg-[#2a1d0f] hover:bg-orange-100' : editingId === f.id ? 'bg-[#16223a]' : 'hover:bg-[#111110]'}`}>
                       {editingId === f.id && editDraft ? (
                         <>
                           <td className="px-3 py-2"><SelectCell value={editDraft.posicion} options={POSICIONES} onChange={v => setEditDraft(d => d ? { ...d, posicion: v } : d)} /></td>
@@ -420,29 +420,29 @@ export default function FilamentosPage() {
                           </td>
                           <td className="px-3 py-2 text-right whitespace-nowrap">
                             <button onClick={() => handleSaveEdit(f.id)} disabled={saving === f.id}
-                              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md mr-1 disabled:opacity-50">
+                              className="text-xs bg-[#2563eb] hover:bg-[#1d4ed8] text-white px-3 py-1 rounded-md mr-1 disabled:opacity-50">
                               {saving === f.id ? '…' : 'Guardar'}
                             </button>
-                            <button onClick={() => setEditingId(null)} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">Cancelar</button>
+                            <button onClick={() => setEditingId(null)} className="text-xs text-[#9a9a92] hover:text-[#d4d4cf] px-2 py-1">Cancelar</button>
                           </td>
                         </>
                       ) : (
                         <>
-                          <td className="px-4 py-3 font-mono text-xs text-gray-500">{f.posicion}</td>
-                          <td className="px-4 py-3 text-gray-600">{f.estante}</td>
-                          <td className="px-4 py-3 font-medium text-gray-900">{f.material}</td>
-                          <td className="px-4 py-3 text-gray-600">{f.tipo}</td>
-                          <td className="px-4 py-3 text-gray-600">{f.marca}</td>
-                          <td className="px-4 py-3 text-gray-800">{f.color}</td>
+                          <td className="px-4 py-3 font-mono text-xs text-[#9a9a92]">{f.posicion}</td>
+                          <td className="px-4 py-3 text-[#9a9a92]">{f.estante}</td>
+                          <td className="px-4 py-3 font-medium text-[#f5f5f0]">{f.material}</td>
+                          <td className="px-4 py-3 text-[#9a9a92]">{f.tipo}</td>
+                          <td className="px-4 py-3 text-[#9a9a92]">{f.marca}</td>
+                          <td className="px-4 py-3 text-[#f5f5f0]">{f.color}</td>
                           <td className="px-4 py-3">
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${NIVEL_COLOR[f.nivel] ?? 'bg-gray-100 text-gray-600'}`}>
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${NIVEL_COLOR[f.nivel] ?? 'bg-[#232320] text-[#9a9a92]'}`}>
                               {f.nivel}
                             </span>
                           </td>
                           <td className="px-4 py-3 text-center">
                             <button onClick={() => handleToggleEnUso(f.id, f.en_uso)}
                               title={f.en_uso ? 'Marcar disponible' : 'Marcar en uso'}
-                              className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-colors ${f.en_uso ? 'bg-orange-400 border-orange-400 text-white' : 'border-gray-300 hover:border-orange-300'}`}>
+                              className={`w-5 h-5 rounded border-2 flex items-center justify-center mx-auto transition-colors ${f.en_uso ? 'bg-orange-400 border-orange-400 text-white' : 'border-[#2a2a28] hover:border-[#f97316]/40'}`}>
                               {f.en_uso && (
                                 <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
@@ -453,17 +453,17 @@ export default function FilamentosPage() {
                           <td className="px-4 py-3 text-right whitespace-nowrap">
                             {deleteConfirm === f.id ? (
                               <>
-                                <span className="text-xs text-gray-500 mr-2">¿Eliminar?</span>
+                                <span className="text-xs text-[#9a9a92] mr-2">¿Eliminar?</span>
                                 <button onClick={() => handleDelete(f.id)} disabled={saving === f.id}
-                                  className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded mr-1 disabled:opacity-50">Sí</button>
-                                <button onClick={() => setDeleteConfirm(null)} className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">No</button>
+                                  className="text-xs bg-[#dc2626] hover:bg-[#b91c1c] text-white px-2 py-1 rounded mr-1 disabled:opacity-50">Sí</button>
+                                <button onClick={() => setDeleteConfirm(null)} className="text-xs text-[#9a9a92] hover:text-[#d4d4cf] px-2 py-1">No</button>
                               </>
                             ) : (
                               <>
                                 <button
                                   onClick={() => { setEditingId(f.id); setEditDraft({ material: f.material, tipo: f.tipo, marca: f.marca, color: f.color, nivel: f.nivel, estante: f.estante, posicion: f.posicion, en_uso: f.en_uso }) }}
-                                  className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 mr-1">Editar</button>
-                                <button onClick={() => setDeleteConfirm(f.id)} className="text-xs text-red-500 hover:text-red-700 px-2 py-1">Eliminar</button>
+                                  className="text-xs text-[#60a5fa] hover:text-[#93c5fd] px-2 py-1 mr-1">Editar</button>
+                                <button onClick={() => setDeleteConfirm(f.id)} className="text-xs text-[#f87171] hover:text-[#fca5a5] px-2 py-1">Eliminar</button>
                               </>
                             )}
                           </td>
@@ -482,19 +482,19 @@ export default function FilamentosPage() {
       {activeTab === 'maestros' && (
         <div className="space-y-5">
           {loadingMaestros ? (
-            <div className="flex items-center justify-center h-48 text-gray-400">Cargando maestros…</div>
+            <div className="flex items-center justify-center h-48 text-[#6b6b65]">Cargando maestros…</div>
           ) : (
             <>
               {/* Ocupación por estante - PRIMERO */}
-              <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Ocupación por estante</h3>
+              <div className="border border-[#2a2a28] rounded-xl p-4 bg-[#1a1a18]">
+                <h3 className="text-sm font-semibold text-[#d4d4cf] mb-3">Ocupación por estante</h3>
                 <div className="flex gap-4">
                   {(maestrosMap.estantes ?? []).map(estante => {
                     const count = filamentos.filter(f => f.estante === estante).length
                     return (
-                      <div key={estante} className="flex-1 text-center p-3 bg-gray-50 rounded-lg">
-                        <p className="text-2xl font-bold text-gray-800">{count}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{estante}</p>
+                      <div key={estante} className="flex-1 text-center p-3 bg-[#111110] rounded-lg">
+                        <p className="text-2xl font-bold text-[#f5f5f0]">{count}</p>
+                        <p className="text-xs text-[#9a9a92] mt-0.5">{estante}</p>
                       </div>
                     )
                   })}
@@ -506,15 +506,15 @@ export default function FilamentosPage() {
                   const items = maestrosRaw.filter(m => m.categoria === key)
                   const isEditing = editingMaestro === key
                   return (
-                    <div key={key} className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
+                    <div key={key} className="border border-[#2a2a28] rounded-xl p-4 bg-[#1a1a18]">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-gray-700">
+                        <h3 className="text-sm font-semibold text-[#d4d4cf]">
                           {label}
-                          <span className="ml-2 text-xs font-normal text-gray-400">{items.length} opciones</span>
+                          <span className="ml-2 text-xs font-normal text-[#6b6b65]">{items.length} opciones</span>
                         </h3>
                         <button
                           onClick={() => { setEditingMaestro(isEditing ? null : key); setNewValor('') }}
-                          className={`text-xs px-2 py-1 rounded-md transition-colors ${isEditing ? 'bg-gray-100 text-gray-500' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                          className={`text-xs px-2 py-1 rounded-md transition-colors ${isEditing ? 'bg-[#232320] text-[#9a9a92]' : 'bg-[#14291a] text-[#4ade80] hover:bg-[#1a3322]'}`}
                         >
                           {isEditing ? 'Cerrar' : '+ Agregar'}
                         </button>
@@ -528,13 +528,13 @@ export default function FilamentosPage() {
                             onChange={e => setNewValor(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleAddMaestro(key)}
                             placeholder={`Nuevo ${label.toLowerCase().slice(0, -1)}…`}
-                            className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-green-500"
+                            className="flex-1 border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-[#16a34a]"
                             autoFocus
                           />
                           <button
                             onClick={() => handleAddMaestro(key)}
                             disabled={savingMaestro || !newValor.trim()}
-                            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
+                            className="bg-[#16a34a] hover:bg-[#15803d] text-white text-xs px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
                           >
                             {savingMaestro ? '…' : 'OK'}
                           </button>
@@ -545,21 +545,21 @@ export default function FilamentosPage() {
                         {items.map(item => (
                           <div key={item.id} className="inline-flex">
                             {deleteConfirmMaestro === item.id ? (
-                              <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-full px-2 py-0.5">
-                                <span className="text-xs text-red-600">{item.valor}</span>
+                              <div className="flex items-center gap-1 bg-[#2a1515] border border-[#4a2020] rounded-full px-2 py-0.5">
+                                <span className="text-xs text-[#f87171]">{item.valor}</span>
                                 <button onClick={() => handleDeleteMaestro(item.id, key, item.valor)}
                                   disabled={savingMaestro}
-                                  className="text-xs text-red-600 hover:text-red-800 font-bold disabled:opacity-50">✕</button>
+                                  className="text-xs text-[#f87171] hover:text-[#fca5a5] font-bold disabled:opacity-50">✕</button>
                                 <button onClick={() => setDeleteConfirmMaestro(null)}
-                                  className="text-xs text-gray-400 hover:text-gray-600">↩</button>
+                                  className="text-xs text-[#6b6b65] hover:text-[#9a9a92]">↩</button>
                               </div>
                             ) : (
-                              <span className="inline-flex items-center gap-1 text-xs bg-gray-100 text-gray-700 rounded-full px-2.5 py-0.5">
+                              <span className="inline-flex items-center gap-1 text-xs bg-[#232320] text-[#d4d4cf] rounded-full px-2.5 py-0.5">
                                 {item.valor}
                                 {isEditing && (
                                   <button
                                     onClick={() => setDeleteConfirmMaestro(item.id)}
-                                    className="ml-0.5 text-gray-300 hover:text-red-500 transition-colors leading-none"
+                                    className="ml-0.5 text-[#4a4a46] hover:text-[#f87171] transition-colors leading-none"
                                     title="Eliminar"
                                   >×</button>
                                 )}
@@ -574,20 +574,20 @@ export default function FilamentosPage() {
               </div>
 
               {/* Posiciones */}
-              <div className="border border-gray-200 rounded-xl p-4 bg-white shadow-sm">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">
+              <div className="border border-[#2a2a28] rounded-xl p-4 bg-[#1a1a18]">
+                <h3 className="text-sm font-semibold text-[#d4d4cf] mb-3">
                   Posiciones
-                  <span className="ml-2 text-xs font-normal text-gray-400">{POSICIONES.length} posiciones</span>
+                  <span className="ml-2 text-xs font-normal text-[#6b6b65]">{POSICIONES.length} posiciones</span>
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   {['AD', 'AT'].map(prefix => {
                     const pos = POSICIONES.filter(p => p.startsWith(prefix))
                     return (
                       <div key={prefix}>
-                        <p className="text-xs font-medium text-gray-500 mb-1.5">{prefix} ({pos.length})</p>
+                        <p className="text-xs font-medium text-[#9a9a92] mb-1.5">{prefix} ({pos.length})</p>
                         <div className="flex flex-wrap gap-1">
                           {pos.map(p => (
-                            <span key={p} className="text-xs bg-gray-100 text-gray-600 rounded px-1.5 py-0.5 font-mono">{p}</span>
+                            <span key={p} className="text-xs bg-[#232320] text-[#9a9a92] rounded px-1.5 py-0.5 font-mono">{p}</span>
                           ))}
                         </div>
                       </div>
@@ -603,8 +603,8 @@ export default function FilamentosPage() {
       {/* Modal agregar filamento */}
       {showAdd && newDraft && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-5">Agregar filamento</h2>
+          <div className="bg-[#1a1a18] rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <h2 className="text-lg font-bold text-[#f5f5f0] mb-5">Agregar filamento</h2>
             <div className="space-y-3">
               {([
                 ['Material', 'material', maestrosMap.materiales ?? []],
@@ -616,27 +616,27 @@ export default function FilamentosPage() {
                 ['Posición', 'posicion', POSICIONES],
               ] as [string, keyof typeof newDraft, string[]][]).map(([label, field, opts]) => (
                 <div key={field} className="flex items-center gap-3">
-                  <label className="text-sm text-gray-600 w-20 flex-shrink-0">{label}</label>
+                  <label className="text-sm text-[#9a9a92] w-20 flex-shrink-0">{label}</label>
                   <select
                     value={newDraft[field] as string}
                     onChange={e => setNewDraft(d => d ? { ...d, [field]: e.target.value } : d)}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    className="flex-1 border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-1 focus:ring-[#3b82f6]"
                   >
                     {opts.map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
               ))}
               <div className="flex items-center gap-3">
-                <label className="text-sm text-gray-600 w-20 flex-shrink-0">En uso</label>
+                <label className="text-sm text-[#9a9a92] w-20 flex-shrink-0">En uso</label>
                 <input type="checkbox" checked={newDraft.en_uso}
                   onChange={e => setNewDraft(d => d ? { ...d, en_uso: e.target.checked } : d)}
                   className="w-4 h-4 accent-orange-500" />
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowAdd(false)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">Cancelar</button>
+              <button onClick={() => setShowAdd(false)} className="text-sm text-[#9a9a92] hover:text-[#d4d4cf] px-4 py-2">Cancelar</button>
               <button onClick={handleAdd} disabled={saving === 'new'}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50">
+                className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50">
                 {saving === 'new' ? 'Guardando…' : 'Agregar'}
               </button>
             </div>
