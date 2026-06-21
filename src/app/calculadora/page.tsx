@@ -197,6 +197,8 @@ export default function CalculadoraPage() {
   const subtotal = costoFilamento + costoElectricidad + costoAmortizacion + costoInsumos
   const margenAbs = subtotal * (config.margen_error_pct / 100)
   const costoBase = subtotal + margenAbs
+  // Costo por pieza individual — gramos/horas ingresados son el total de la tirada para "cantPiezas" unidades
+  const costoPorPieza = cantPiezas > 0 ? costoBase / cantPiezas : costoBase
 
   const pct = (v: number) => costoBase > 0 ? (v / costoBase) * 100 : 0
 
@@ -275,10 +277,10 @@ export default function CalculadoraPage() {
             )}
 
             <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-              Precio final: <strong>
+              Precio final {cantPiezas > 1 ? '(por pieza)' : ''}: <strong>
                 {config.margen_modo === 'multiplicador'
-                  ? $$(costoBase * config.margen_multiplicador)
-                  : $$(costoBase * (1 + config.margen_porcentaje / 100))}
+                  ? $$(costoPorPieza * config.margen_multiplicador)
+                  : $$(costoPorPieza * (1 + config.margen_porcentaje / 100))}
               </strong>
             </div>
           </div>
@@ -374,30 +376,33 @@ export default function CalculadoraPage() {
           {/* 1. COSTO TOTAL + resumen impresión */}
           <div style={{ background: '#111110', borderRadius: 12, padding: '16px', marginBottom: 18 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: '#555', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 8 }}>
-              Costo total de producción
+              {cantPiezas > 1 ? 'Costo de producción (total tirada)' : 'Costo de producción'}
             </div>
-            <div style={{ fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: '-1px', marginBottom: 8 }}>
+            <div style={{ fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: '-1px', marginBottom: 4 }}>
               {$$(costoBase)}
             </div>
-            <div style={{ display: 'flex', gap: 12 }}>
+            {cantPiezas > 1 && (
+              <div style={{ fontSize: 13, color: '#fb923c', fontWeight: 600, marginBottom: 8 }}>
+                {$$(costoPorPieza)} por pieza
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 12, marginTop: cantPiezas > 1 ? 4 : 0 }}>
               <div style={{ background: '#1a1a18', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: '#888' }}>
                 ⏱ {horas}h {minutos}m
               </div>
               <div style={{ background: '#1a1a18', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: '#888' }}>
                 🧵 {gramosConDesperdicio.toFixed(0)}g
               </div>
-              {cantPiezas > 1 && (
-                <div style={{ background: '#1a1a18', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: '#888' }}>
-                  {$$(costoBase / cantPiezas)}/u
-                </div>
-              )}
+              <div style={{ background: '#1a1a18', borderRadius: 8, padding: '6px 10px', fontSize: 11, color: '#888' }}>
+                {cantPiezas} {cantPiezas === 1 ? 'pieza' : 'piezas'}
+              </div>
             </div>
           </div>
 
           {/* 2. DESGLOSE con barras */}
           <div style={{ marginBottom: 18 }}>
             <div style={{ fontSize: 10, fontWeight: 600, color: '#555', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 12 }}>
-              Desglose de costos
+              Desglose de costos {cantPiezas > 1 ? '(total tirada)' : ''}
             </div>
             <CostBar label="Filamento" value={costoFilamento} pct={pct(costoFilamento)} color="#f97316" />
             <CostBar label="Electricidad" value={costoElectricidad} pct={pct(costoElectricidad)} color="#3b82f6" />
@@ -408,22 +413,25 @@ export default function CalculadoraPage() {
             <CostBar label={`Margen error (${config.margen_error_pct}%)`} value={margenAbs} pct={pct(margenAbs)} color="#6b7280" />
           </div>
 
-          {/* 3. PRECIOS SUGERIDOS */}
+          {/* 3. PRECIOS SUGERIDOS (por pieza) */}
           <div>
-            <div style={{ fontSize: 10, fontWeight: 600, color: '#555', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 12 }}>
+            <div style={{ fontSize: 10, fontWeight: 600, color: '#555', textTransform: 'uppercase' as const, letterSpacing: '0.07em', marginBottom: 4 }}>
               Precios de venta sugeridos
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <PriceCard label="Mínimo" sublabel="Solo para cubrir costos" mult={1.5} costoBase={costoBase} accent="#9ca3af" />
-              <PriceCard label="Recomendado" sublabel="Margen saludable" mult={3} costoBase={costoBase} accent="#4ade80" />
+            {cantPiezas > 1 && (
+              <div style={{ fontSize: 11, color: '#666', marginBottom: 12 }}>Por pieza individual</div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: cantPiezas > 1 ? 0 : 12 }}>
+              <PriceCard label="Mínimo" sublabel="Solo para cubrir costos" mult={1.5} costoBase={costoPorPieza} accent="#9ca3af" />
+              <PriceCard label="Recomendado" sublabel="Margen saludable" mult={3} costoBase={costoPorPieza} accent="#4ade80" />
               <PriceCardCustom
-                costoBase={costoBase}
+                costoBase={costoPorPieza}
                 accent="#fb923c"
                 modo={config.margen_modo}
                 multiplicador={config.margen_multiplicador}
                 porcentaje={config.margen_porcentaje}
               />
-              <PriceCard label="Premium" sublabel="Alta complejidad" mult={4} costoBase={costoBase} accent="#60a5fa" />
+              <PriceCard label="Premium" sublabel="Alta complejidad" mult={4} costoBase={costoPorPieza} accent="#60a5fa" />
             </div>
           </div>
 
@@ -457,8 +465,8 @@ export default function CalculadoraPage() {
             costo_impresora: config.costo_impresora,
             vida_util_hs: config.vida_util_hs,
             margen_error_pct: config.margen_error_pct,
-            costo_produccion: costoBase,
-            precio_venta_sugerido: costoBase * 3,
+            costo_produccion: costoPorPieza,
+            precio_venta_sugerido: costoPorPieza * 3,
             insumos_usados: insumos.filter(i => i.activo).map(i => ({
               insumo_id: i.id, nombre: i.nombre, costo_por_pieza: i.costo_por_pieza,
             })),
@@ -584,7 +592,8 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
       >
         <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', marginTop: 0, marginBottom: 4 }}>Guardar como producto</h2>
         <p style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 18 }}>
-          Receta: {d.gramos}g · {d.horas}h {d.minutos}m · {d.cantPiezas} {d.cantPiezas === 1 ? 'pieza' : 'piezas'}
+          Tirada completa: {d.gramos}g · {d.horas}h {d.minutos}m para {d.cantPiezas} {d.cantPiezas === 1 ? 'pieza' : 'piezas'}
+          {d.cantPiezas > 1 && <> · <strong>{$$(d.costo_produccion)}</strong> por unidad</>}
         </p>
 
         {error && (
