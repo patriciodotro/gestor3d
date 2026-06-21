@@ -5,20 +5,20 @@ import { supabase, type Insumo } from '@/lib/supabase'
 const fmt = (n: number) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
 const CAT = [
-  { value: 'impresion', label: 'Impresión', color: '#185FA5', bg: '#E6F1FB' },
-  { value: 'post_procesado', label: 'Post-procesado', color: '#854F0B', bg: '#FAEEDA' },
-  { value: 'packaging', label: 'Packaging', color: '#3B6D11', bg: '#EAF3DE' },
+  { value: 'impresion', label: 'Impresión', color: 'var(--color-accent-blue)', bg: 'var(--color-accent-blue-bg)' },
+  { value: 'post_procesado', label: 'Post-procesado', color: 'var(--color-accent-yellow)', bg: 'var(--color-accent-yellow-bg)' },
+  { value: 'packaging', label: 'Packaging', color: 'var(--color-brand)', bg: 'var(--color-brand-light)' },
 ]
 
 const S = {
-  input: { width: '100%', padding: '7px 10px', fontSize: 14, border: '1px solid #e5e5e0', borderRadius: 8, background: '#fafaf8', color: '#1a1a18', fontFamily: 'inherit' } as React.CSSProperties,
-  label: { fontSize: 12, color: '#6b6b65', display: 'block', marginBottom: 4, fontWeight: 500 } as React.CSSProperties,
-  card: { background: '#fff', border: '1px solid #e5e5e0', borderRadius: 12, padding: '16px 20px', marginBottom: 12 } as React.CSSProperties,
+  input: { width: '100%', padding: '7px 10px', fontSize: 14, border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', color: 'var(--color-text)', fontFamily: 'inherit' } as React.CSSProperties,
+  label: { fontSize: 12, color: 'var(--color-muted)', display: 'block', marginBottom: 4, fontWeight: 500 } as React.CSSProperties,
+  card: { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 12, padding: '16px 20px', marginBottom: 12 } as React.CSSProperties,
   btn: (v: 'default' | 'primary' | 'danger' = 'default') => ({
     padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
-    border: v === 'primary' ? 'none' : v === 'danger' ? '1px solid #FCEBEB' : '1px solid #e5e5e0',
-    background: v === 'primary' ? '#16a34a' : v === 'danger' ? '#FCEBEB' : '#fff',
-    color: v === 'primary' ? '#fff' : v === 'danger' ? '#A32D2D' : '#1a1a18',
+    border: v === 'primary' ? 'none' : v === 'danger' ? '1px solid var(--color-accent-red-bg)' : '1px solid var(--color-border)',
+    background: v === 'primary' ? 'var(--color-brand)' : v === 'danger' ? 'var(--color-accent-red-bg)' : 'transparent',
+    color: v === 'primary' ? '#fff' : v === 'danger' ? 'var(--color-accent-red)' : 'var(--color-text)',
   } as React.CSSProperties),
 }
 
@@ -73,40 +73,40 @@ export default function InsumosPage() {
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 600 }}>Insumos</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text)' }}>Insumos</h1>
         <button style={S.btn('primary')} onClick={abrirNuevo}>+ Nuevo insumo</button>
       </div>
 
       {/* Filtro */}
-      <div style={{ display: 'flex', gap: 0, background: '#f0f0ec', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 20 }}>
+      <div style={{ display: 'flex', gap: 0, background: 'var(--color-surface-2)', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 20 }}>
         {[{ value: 'todos', label: 'Todos' }, ...CAT].map(c => (
           <button key={c.value} onClick={() => setFiltroCat(c.value)} style={{
             padding: '6px 16px', borderRadius: 6, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: 'none',
-            background: filtroCat === c.value ? '#fff' : 'transparent',
-            color: filtroCat === c.value ? '#1a1a18' : '#6b6b65',
-            boxShadow: filtroCat === c.value ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+            background: filtroCat === c.value ? 'var(--color-surface)' : 'transparent',
+            color: filtroCat === c.value ? 'var(--color-text)' : 'var(--color-muted)',
+            boxShadow: filtroCat === c.value ? '0 1px 3px rgba(0,0,0,0.3)' : 'none',
           }}>{c.label}</button>
         ))}
       </div>
 
-      {loading ? <p style={{ color: '#6b6b65' }}>Cargando...</p> : (
+      {loading ? <p style={{ color: 'var(--color-muted)' }}>Cargando...</p> : (
         porCat.map(cat => cat.items.length > 0 && (
           <div key={cat.value} style={{ marginBottom: 24 }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: '#6b6b65', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+            <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
               {cat.label}
             </div>
             <div style={S.card}>
               {cat.items.map((ins, idx) => (
-                <div key={ins.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 130px 90px 80px', gap: 10, alignItems: 'center', padding: '10px 0', borderBottom: idx < cat.items.length - 1 ? '1px solid #f0f0ec' : 'none' }}>
+                <div key={ins.id} style={{ display: 'grid', gridTemplateColumns: '1fr 120px 130px 90px 80px', gap: 10, alignItems: 'center', padding: '10px 0', borderBottom: idx < cat.items.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
                   <div>
-                    <div style={{ fontWeight: 500, fontSize: 14 }}>{ins.nombre}</div>
-                    <div style={{ fontSize: 12, color: '#6b6b65' }}>{ins.unidad}</div>
+                    <div style={{ fontWeight: 500, fontSize: 14, color: 'var(--color-text)' }}>{ins.nombre}</div>
+                    <div style={{ fontSize: 12, color: 'var(--color-muted)' }}>{ins.unidad}</div>
                   </div>
                   <span style={{ padding: '2px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, background: cat.bg, color: cat.color, width: 'fit-content' }}>
                     {cat.label}
                   </span>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{fmt(ins.costo_por_pieza)} / pieza</div>
-                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: ins.activo_por_defecto ? '#EAF3DE' : '#f0f0ec', color: ins.activo_por_defecto ? '#3B6D11' : '#6b6b65', width: 'fit-content' }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--color-text)' }}>{fmt(ins.costo_por_pieza)} / pieza</div>
+                  <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 6, background: ins.activo_por_defecto ? 'var(--color-brand-light)' : 'var(--color-surface-2)', color: ins.activo_por_defecto ? 'var(--color-brand)' : 'var(--color-muted)', width: 'fit-content' }}>
                     {ins.activo_por_defecto ? 'Por defecto' : 'Opcional'}
                   </span>
                   <div style={{ display: 'flex', gap: 6 }}>
@@ -122,9 +122,9 @@ export default function InsumosPage() {
 
       {/* Modal */}
       {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <div style={{ background: '#fff', borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw' }}>
-            <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 20 }}>{editando ? 'Editar insumo' : 'Nuevo insumo'}</h2>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 28, width: 420, maxWidth: '90vw' }}>
+            <h2 style={{ fontSize: 17, fontWeight: 600, marginBottom: 20, color: 'var(--color-text)' }}>{editando ? 'Editar insumo' : 'Nuevo insumo'}</h2>
             <div style={{ display: 'grid', gap: 14 }}>
               <div>
                 <label style={S.label}>Nombre *</label>
@@ -146,7 +146,7 @@ export default function InsumosPage() {
                   <input style={S.input} value={form.unidad} onChange={e => setForm(f => ({ ...f, unidad: e.target.value }))} placeholder="puff, gota, unidad..." />
                 </div>
               </div>
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14 }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', fontSize: 14, color: 'var(--color-text)' }}>
                 <input type="checkbox" checked={form.activo_por_defecto} onChange={e => setForm(f => ({ ...f, activo_por_defecto: e.target.checked }))} />
                 Activado por defecto en nuevos presupuestos
               </label>
