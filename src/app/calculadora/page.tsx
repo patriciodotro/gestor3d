@@ -135,69 +135,23 @@ function PriceCard({ label, mult, costoBase, accent, sublabel }: {
   )
 }
 
-// ── Tarjeta "Con margen" editable (multiplicador o %) ───
-function PriceCardCustom({
-  costoBase, accent, modo, multiplicador, porcentaje, onModoChange, onMultChange, onPctChange,
-}: {
+// ── Tarjeta "Con margen" — se ve igual que las demás ────
+function PriceCardCustom({ costoBase, accent, modo, multiplicador, porcentaje }: {
   costoBase: number; accent: string
   modo: 'multiplicador' | 'porcentaje'
   multiplicador: number; porcentaje: number
-  onModoChange: (m: 'multiplicador' | 'porcentaje') => void
-  onMultChange: (v: number) => void
-  onPctChange: (v: number) => void
 }) {
-  // precio según modo: multiplicador -> costoBase * mult
-  // porcentaje -> ganancia deseada = costoBase * (pct/100), precio = costoBase + ganancia
   const precio = modo === 'multiplicador'
     ? costoBase * multiplicador
     : costoBase * (1 + porcentaje / 100)
   const ganancia = precio - costoBase
   const pctGanancia = precio > 0 ? (ganancia / precio) * 100 : 0
+  const sublabel = modo === 'multiplicador' ? `Tu margen · ×${multiplicador}` : `Tu margen · ${porcentaje}%`
 
   return (
-    <div style={{ background: '#2a2a28', borderRadius: 10, padding: '12px 14px', border: `1px solid ${accent}30`, gridColumn: '1 / -1' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div>
-          <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-muted-2)', textTransform: 'uppercase' as const, letterSpacing: '0.06em' }}>Con margen</div>
-          <div style={{ fontSize: 10, color: '#555' }}>Tu margen personalizado</div>
-        </div>
-        {/* Toggle modo */}
-        <div style={{ display: 'flex', background: '#1f1f1c', borderRadius: 7, padding: 2 }}>
-          {(['multiplicador', 'porcentaje'] as const).map(m => (
-            <button key={m} onClick={() => onModoChange(m)} style={{
-              padding: '4px 10px', borderRadius: 5, fontSize: 10, fontWeight: 600, border: 'none', cursor: 'pointer',
-              background: modo === m ? accent : 'transparent',
-              color: modo === m ? '#1a1a18' : 'var(--color-muted)',
-              transition: 'background 0.15s',
-            }}>
-              {m === 'multiplicador' ? '×' : '%'}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-        {modo === 'multiplicador' ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>×</span>
-            <input
-              type="number" min={1} step={0.1} value={multiplicador}
-              onChange={e => onMultChange(Number(e.target.value))}
-              style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-input-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit' }}
-            />
-          </div>
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <input
-              type="number" min={0} step={1} value={porcentaje}
-              onChange={e => onPctChange(Number(e.target.value))}
-              style={{ width: 56, padding: '4px 6px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'var(--color-input-bg)', color: 'var(--color-text)', fontSize: 13, fontFamily: 'inherit' }}
-            />
-            <span style={{ fontSize: 13, color: 'var(--color-muted)' }}>% de ganancia</span>
-          </div>
-        )}
-      </div>
-
+    <div style={{ background: '#2a2a28', borderRadius: 10, padding: '12px 14px', border: `1px solid ${accent}30` }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--color-muted-2)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 2 }}>Con margen</div>
+      <div style={{ fontSize: 10, color: '#555', marginBottom: 8 }}>{sublabel}</div>
       <div style={{ fontSize: 20, fontWeight: 800, color: accent, marginBottom: 6 }}>{$$(precio)}</div>
       <div style={{ fontSize: 11, color: '#888' }}>
         Ganancia: <span style={{ color: '#4ade80', fontWeight: 600 }}>{$$(ganancia)}</span>
@@ -364,6 +318,53 @@ export default function CalculadoraPage() {
             </div>
           </SubSection>
         </Section>
+
+        {/* MARGEN DE GANANCIA PERSONALIZADO */}
+        <Section title="Margen de ganancia" icon="💰" defaultOpen={false}>
+          <div style={{ marginTop: 12 }}>
+            {/* Toggle modo */}
+            <div style={{ display: 'flex', background: 'var(--color-surface-2)', borderRadius: 8, padding: 3, width: 'fit-content', marginBottom: 14 }}>
+              {(['multiplicador', 'porcentaje'] as const).map(m => (
+                <button key={m} onClick={() => setC('margen_modo', m)} style={{
+                  padding: '6px 18px', borderRadius: 6, fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: 'inherit',
+                  background: config.margen_modo === m ? '#fb923c' : 'transparent',
+                  color: config.margen_modo === m ? '#1a1a18' : 'var(--color-muted)',
+                }}>
+                  {m === 'multiplicador' ? 'Multiplicador (×)' : 'Porcentaje (%)'}
+                </button>
+              ))}
+            </div>
+
+            {config.margen_modo === 'multiplicador' ? (
+              <>
+                <label style={{ fontSize: 11, color: 'var(--color-muted)', fontWeight: 500, display: 'block', marginBottom: 6 }}>Multiplicador rápido</label>
+                <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                  {[2, 2.5, 3, 3.5].map(v => (
+                    <button key={v} onClick={() => setC('margen_multiplicador', v)} style={{
+                      flex: 1, padding: '8px 0', borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                      border: config.margen_multiplicador === v ? '1px solid #fb923c' : '1px solid var(--color-border)',
+                      background: config.margen_multiplicador === v ? '#fb923c20' : 'transparent',
+                      color: config.margen_multiplicador === v ? '#fb923c' : 'var(--color-text)',
+                    }}>
+                      ×{v}
+                    </button>
+                  ))}
+                </div>
+                <Field label="Multiplicador personalizado" value={config.margen_multiplicador} onChange={v => setC('margen_multiplicador', v)} prefix="×" step={0.1} min={1} />
+              </>
+            ) : (
+              <Field label="Porcentaje de ganancia deseado" value={config.margen_porcentaje} onChange={v => setC('margen_porcentaje', v)} suffix="%" step={5} />
+            )}
+
+            <div style={{ marginTop: 12, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
+              Precio final: <strong>
+                {config.margen_modo === 'multiplicador'
+                  ? $$(costoBase * config.margen_multiplicador)
+                  : $$(costoBase * (1 + config.margen_porcentaje / 100))}
+              </strong>
+            </div>
+          </div>
+        </Section>
       </div>
 
       {/* ══ DERECHA — RESULTADOS ══ */}
@@ -421,9 +422,6 @@ export default function CalculadoraPage() {
                 modo={config.margen_modo}
                 multiplicador={config.margen_multiplicador}
                 porcentaje={config.margen_porcentaje}
-                onModoChange={m => setC('margen_modo', m)}
-                onMultChange={v => setC('margen_multiplicador', v)}
-                onPctChange={v => setC('margen_porcentaje', v)}
               />
               <PriceCard label="Premium" sublabel="Alta complejidad" mult={6} costoBase={costoBase} accent="#60a5fa" />
             </div>
