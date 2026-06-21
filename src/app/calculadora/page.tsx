@@ -215,6 +215,7 @@ export default function CalculadoraPage() {
   const [horas, setHoras] = useState(3)
   const [minutos, setMinutos] = useState(0)
   const [cantPiezas, setCantPiezas] = useState(1)
+  const [showGuardar, setShowGuardar] = useState(false)
 
   useEffect(() => {
     try {
@@ -431,8 +432,274 @@ export default function CalculadoraPage() {
           <p style={{ fontSize: 10, color: '#444', marginTop: 14, lineHeight: 1.5 }}>
             Los multiplicadores son orientativos. Ajustá según complejidad, diseño y mercado.
           </p>
+
+          <button
+            onClick={() => setShowGuardar(true)}
+            style={{
+              width: '100%', marginTop: 16, padding: '10px 0', borderRadius: 10, border: 'none', cursor: 'pointer',
+              background: 'var(--color-brand)', color: '#fff', fontSize: 13, fontWeight: 600, fontFamily: 'inherit',
+            }}
+          >
+            📦 Guardar como producto
+          </button>
         </div>
       </div>
+      </div>
+
+      {/* MODAL: Guardar como producto */}
+      {showGuardar && (
+        <GuardarProductoModal
+          onClose={() => setShowGuardar(false)}
+          datosCalculados={{
+            gramos, horas, minutos, cantPiezas,
+            precio_kg: config.precio_kg,
+            desperdicio_pct: config.desperdicio_pct,
+            precio_kwh: config.precio_kwh,
+            consumo_w: config.consumo_w,
+            costo_impresora: config.costo_impresora,
+            vida_util_hs: config.vida_util_hs,
+            margen_error_pct: config.margen_error_pct,
+            costo_produccion: costoBase,
+            precio_venta_sugerido: costoBase * 3,
+            insumos_usados: insumos.filter(i => i.activo).map(i => ({
+              insumo_id: i.id, nombre: i.nombre, costo_por_pieza: i.costo_por_pieza,
+            })),
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════
+// MODAL: Guardar como producto
+// ══════════════════════════════════════════════════════
+type DatosCalculados = {
+  gramos: number; horas: number; minutos: number; cantPiezas: number
+  precio_kg: number; desperdicio_pct: number; precio_kwh: number; consumo_w: number
+  costo_impresora: number; vida_util_hs: number; margen_error_pct: number
+  costo_produccion: number; precio_venta_sugerido: number
+  insumos_usados: { insumo_id: string; nombre: string; costo_por_pieza: number }[]
+}
+
+function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => void; datosCalculados: DatosCalculados }) {
+  const [nombre, setNombre] = useState('')
+  const [categoria, setCategoria] = useState('')
+  const [notas, setNotas] = useState('')
+  const [filamentoTipo, setFilamentoTipo] = useState<'fijo' | 'variable'>('variable')
+  const [filMaterial, setFilMaterial] = useState('PLA')
+  const [filColor, setFilColor] = useState('')
+  const [filMarca, setFilMarca] = useState('')
+  const [precioVenta, setPrecioVenta] = useState(Math.round(d.precio_venta_sugerido))
+  const [stock, setStock] = useState(0)
+
+  const [fotoFile, setFotoFile] = useState<File | null>(null)
+  const [fotoPreview, setFotoPreview] = useState<string | null>(null)
+  const [fotoUrlManual, setFotoUrlManual] = useState('')
+  const [modoFoto, setModoFoto] = useState<'subir' | 'url'>('subir')
+
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState('')
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setFotoFile(file)
+    setFotoPreview(URL.createObjectURL(file))
+  }
+
+  async function handleGuardar() {
+    if (!nombre.trim()) { setError('Ponele un nombre al producto.'); return }
+    setGuardando(true)
+    setError('')
+
+    let foto_url: string | null = null
+
+    try {
+      if (modoFoto === 'subir' && fotoFile) {
+        const ext = fotoFile.name.split('.').pop()
+        const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+        const { error: upErr } = await supabase.storage.from('productos').upload(path, fotoFile)
+        if (upErr) throw upErr
+        const { data: pub } = supabase.storage.from('productos').getPublicUrl(path)
+        foto_url = pub.publicUrl
+      } else if (modoFoto === 'url' && fotoUrlManual.trim()) {
+        foto_url = fotoUrlManual.trim()
+      }
+
+      const payload = {
+        nombre: nombre.trim(),
+        categoria: categoria.trim() || null,
+        precio: precioVenta,
+        stock,
+        costo_material: d.costo_produccion,
+        tiempo_horas: d.horas,
+        notas: notas.trim() || null,
+        foto_url,
+        gramos: d.gramos,
+        minutos_impresion: d.minutos,
+        cantidad_piezas: d.cantPiezas,
+        filamento_tipo: filamentoTipo,
+        filamento_material: filamentoTipo === 'fijo' ? filMaterial : null,
+        filamento_color: filamentoTipo === 'fijo' ? filColor : null,
+        filamento_marca: filamentoTipo === 'fijo' ? filMarca : null,
+        precio_kg: d.precio_kg,
+        desperdicio_pct: d.desperdicio_pct,
+        precio_kwh: d.precio_kwh,
+        consumo_w: d.consumo_w,
+        costo_impresora: d.costo_impresora,
+        vida_util_hs: d.vida_util_hs,
+        margen_error_pct: d.margen_error_pct,
+        costo_produccion: d.costo_produccion,
+        precio_venta_sugerido: precioVenta,
+        insumos_usados: d.insumos_usados,
+      }
+
+      const { error: insErr } = await supabase.from('productos').insert(payload)
+      if (insErr) throw insErr
+
+      onClose()
+    } catch (e: any) {
+      setError(e.message || 'Error al guardar el producto.')
+    }
+    setGuardando(false)
+  }
+
+  const inputStyle: React.CSSProperties = {
+    width: '100%', padding: '8px 10px', fontSize: 14, border: '1px solid var(--color-border)',
+    borderRadius: 8, background: 'var(--color-input-bg)', color: 'var(--color-text)', fontFamily: 'inherit',
+  }
+  const labelStyle: React.CSSProperties = { fontSize: 12, color: 'var(--color-muted)', display: 'block', marginBottom: 4, fontWeight: 500 }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 20 }}
+      onClick={onClose}>
+      <div
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, width: 480, maxWidth: '92vw', maxHeight: '88vh', overflowY: 'auto', padding: 24 }}
+        onClick={e => e.stopPropagation()}
+      >
+        <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', marginTop: 0, marginBottom: 4 }}>Guardar como producto</h2>
+        <p style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 18 }}>
+          Receta: {d.gramos}g · {d.horas}h {d.minutos}m · {d.cantPiezas} {d.cantPiezas === 1 ? 'pieza' : 'piezas'}
+        </p>
+
+        {error && (
+          <div style={{ background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 14 }}>
+            {error}
+          </div>
+        )}
+
+        <div style={{ display: 'grid', gap: 14 }}>
+          {/* Nombre y categoría */}
+          <div>
+            <label style={labelStyle}>Nombre del producto *</label>
+            <input style={inputStyle} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Maceta hexagonal grande" />
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Categoría</label>
+              <input style={inputStyle} value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej: Wuly, Lenga..." />
+            </div>
+            <div>
+              <label style={labelStyle}>Stock inicial</label>
+              <input type="number" style={inputStyle} value={stock} onChange={e => setStock(Number(e.target.value))} />
+            </div>
+          </div>
+
+          {/* Foto */}
+          <div>
+            <label style={labelStyle}>Foto del producto</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              {(['subir', 'url'] as const).map(m => (
+                <button key={m} onClick={() => setModoFoto(m)} style={{
+                  padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer',
+                  background: modoFoto === m ? 'var(--color-brand)' : 'transparent',
+                  color: modoFoto === m ? '#fff' : 'var(--color-text)',
+                }}>
+                  {m === 'subir' ? 'Subir archivo' : 'Pegar URL'}
+                </button>
+              ))}
+            </div>
+            {modoFoto === 'subir' ? (
+              <>
+                <input type="file" accept="image/*" onChange={handleFileChange} style={{ fontSize: 13, color: 'var(--color-muted)' }} />
+                {fotoPreview && (
+                  <img src={fotoPreview} alt="preview" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8, marginTop: 8 }} />
+                )}
+              </>
+            ) : (
+              <input style={inputStyle} value={fotoUrlManual} onChange={e => setFotoUrlManual(e.target.value)} placeholder="https://..." />
+            )}
+          </div>
+
+          {/* Filamento fijo o variable */}
+          <div>
+            <label style={labelStyle}>Filamento / color</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <button onClick={() => setFilamentoTipo('variable')} style={{
+                flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer',
+                background: filamentoTipo === 'variable' ? 'var(--color-accent-purple)' : 'transparent',
+                color: filamentoTipo === 'variable' ? '#1a1a18' : 'var(--color-text)',
+              }}>
+                A elección del cliente
+              </button>
+              <button onClick={() => setFilamentoTipo('fijo')} style={{
+                flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer',
+                background: filamentoTipo === 'fijo' ? 'var(--color-accent-blue)' : 'transparent',
+                color: filamentoTipo === 'fijo' ? '#1a1a18' : 'var(--color-text)',
+              }}>
+                Color fijo
+              </button>
+            </div>
+            {filamentoTipo === 'fijo' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                <input style={inputStyle} value={filMaterial} onChange={e => setFilMaterial(e.target.value)} placeholder="Material" />
+                <input style={inputStyle} value={filColor} onChange={e => setFilColor(e.target.value)} placeholder="Color" />
+                <input style={inputStyle} value={filMarca} onChange={e => setFilMarca(e.target.value)} placeholder="Marca" />
+              </div>
+            )}
+          </div>
+
+          {/* Insumos usados (resumen, no editable acá) */}
+          {d.insumos_usados.length > 0 && (
+            <div>
+              <label style={labelStyle}>Insumos / packaging incluidos</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap' as const, gap: 6 }}>
+                {d.insumos_usados.map(i => (
+                  <span key={i.insumo_id} style={{ fontSize: 11, padding: '3px 9px', borderRadius: 12, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
+                    {i.nombre}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Precio de venta */}
+          <div>
+            <label style={labelStyle}>Precio de venta final</label>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <input type="number" style={inputStyle} value={precioVenta} onChange={e => setPrecioVenta(Number(e.target.value))} />
+              <span style={{ fontSize: 11, color: 'var(--color-muted)', whiteSpace: 'nowrap' as const }}>
+                Costo: {$$(d.costo_produccion)}
+              </span>
+            </div>
+          </div>
+
+          {/* Notas */}
+          <div>
+            <label style={labelStyle}>Notas (opcional)</label>
+            <textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' as const }} value={notas} onChange={e => setNotas(e.target.value)} placeholder="Detalles de la receta, variantes, etc." />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
+          <button onClick={onClose} style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+            Cancelar
+          </button>
+          <button onClick={handleGuardar} disabled={guardando} style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: 'var(--color-brand)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', opacity: guardando ? 0.6 : 1 }}>
+            {guardando ? 'Guardando...' : 'Guardar producto'}
+          </button>
+        </div>
       </div>
     </div>
   )
