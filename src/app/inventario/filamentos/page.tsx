@@ -52,11 +52,11 @@ const NIVEL_COLOR: Record<string, string> = {
 }
 
 const NIVEL_DOT: Record<string, string> = {
-  'Cerrado':      'bg-[#16223a]0',
-  'Lleno':        'bg-[#14291a]0',
-  'Tres cuartos': 'bg-emerald-400',
-  'Medio':        'bg-yellow-400',
-  'Poco':         'bg-[#2a1515]0',
+  'Cerrado':      'bg-[#60a5fa]',
+  'Lleno':        'bg-[#4ade80]',
+  'Tres cuartos': 'bg-[#34d399]',
+  'Medio':        'bg-[#eab308]',
+  'Poco':         'bg-[#f87171]',
 }
 
 const CATEGORIAS: { key: string; label: string }[] = [
@@ -93,6 +93,9 @@ export default function FilamentosPage() {
   const [search, setSearch] = useState('')
   const [filterMaterial, setFilterMaterial] = useState('')
   const [filterEstante, setFilterEstante] = useState('')
+  const [filterTipo, setFilterTipo] = useState('')
+  const [filterMarca, setFilterMarca] = useState('')
+  const [filterColor, setFilterColor] = useState('')
   const [filterNivel, setFilterNivel] = useState('')
   const [filterEnUso, setFilterEnUso] = useState(false)
   const [sortKey, setSortKey] = useState<SortKey>('posicion')
@@ -188,8 +191,11 @@ export default function FilamentosPage() {
       const matchSearch = !q || [f.material, f.tipo, f.marca, f.color, f.estante, f.posicion]
         .some(v => v.toLowerCase().includes(q))
       return matchSearch
-        && (!filterMaterial || f.material === filterMaterial)
         && (!filterEstante || f.estante === filterEstante)
+        && (!filterMaterial || f.material === filterMaterial)
+        && (!filterTipo || f.tipo === filterTipo)
+        && (!filterMarca || f.marca === filterMarca)
+        && (!filterColor || f.color === filterColor)
         && (!filterNivel || f.nivel === filterNivel)
         && (!filterEnUso || f.en_uso)
     })
@@ -198,6 +204,13 @@ export default function FilamentosPage() {
       const vb = b[sortKey] ?? ''
       return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va)
     })
+
+  // Posiciones libres de un estante (opcionalmente incluye una posición aunque esté "ocupada",
+  // útil para no perder la selección actual al editar)
+  const getPosicionesDisponibles = (estante: string, incluir?: string) =>
+    POSICIONES.filter(p =>
+      p === incluir || !filamentos.some(f => f.estante === estante && f.posicion === p)
+    )
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc)
@@ -282,7 +295,12 @@ export default function FilamentosPage() {
           </p>
         </div>
         <button
-          onClick={() => { setShowAdd(true); setNewDraft(EMPTY_FILAMENTO(maestrosMap)) }}
+          onClick={() => {
+            const draft = EMPTY_FILAMENTO(maestrosMap)
+            const disponibles = getPosicionesDisponibles(draft.estante)
+            setNewDraft({ ...draft, posicion: disponibles[0] ?? '' })
+            setShowAdd(true)
+          }}
           className="flex items-center gap-2 bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
         >
           + Agregar filamento
@@ -346,15 +364,30 @@ export default function FilamentosPage() {
               onChange={e => setSearch(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6] w-44"
             />
+            <select value={filterEstante} onChange={e => setFilterEstante(e.target.value)}
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
+              <option value="">Todos los estantes</option>
+              {(maestrosMap.estantes ?? []).map(e => <option key={e}>{e}</option>)}
+            </select>
             <select value={filterMaterial} onChange={e => setFilterMaterial(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los materiales</option>
               {(maestrosMap.materiales ?? []).map(m => <option key={m}>{m}</option>)}
             </select>
-            <select value={filterEstante} onChange={e => setFilterEstante(e.target.value)}
+            <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
-              <option value="">Todos los estantes</option>
-              {(maestrosMap.estantes ?? []).map(e => <option key={e}>{e}</option>)}
+              <option value="">Todos los tipos</option>
+              {(maestrosMap.tipos ?? []).map(t => <option key={t}>{t}</option>)}
+            </select>
+            <select value={filterMarca} onChange={e => setFilterMarca(e.target.value)}
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
+              <option value="">Todas las marcas</option>
+              {(maestrosMap.marcas ?? []).map(m => <option key={m}>{m}</option>)}
+            </select>
+            <select value={filterColor} onChange={e => setFilterColor(e.target.value)}
+              className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
+              <option value="">Todos los colores</option>
+              {(maestrosMap.colores ?? []).map(c => <option key={c}>{c}</option>)}
             </select>
             <select value={filterNivel} onChange={e => setFilterNivel(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
@@ -369,9 +402,9 @@ export default function FilamentosPage() {
             >
               <span className="inline-block w-2 h-2 rounded-full bg-orange-400" /> En uso
             </button>
-            {(search || filterMaterial || filterEstante || filterNivel || filterEnUso) && (
+            {(search || filterMaterial || filterEstante || filterTipo || filterMarca || filterColor || filterNivel || filterEnUso) && (
               <button
-                onClick={() => { setSearch(''); setFilterMaterial(''); setFilterEstante(''); setFilterNivel(''); setFilterEnUso(false) }}
+                onClick={() => { setSearch(''); setFilterMaterial(''); setFilterEstante(''); setFilterTipo(''); setFilterMarca(''); setFilterColor(''); setFilterNivel(''); setFilterEnUso(false) }}
                 className="text-sm text-[#9a9a92] hover:text-[#d4d4cf] underline"
               >Limpiar</button>
             )}
@@ -613,19 +646,48 @@ export default function FilamentosPage() {
                 ['Color',    'color',    maestrosMap.colores   ?? []],
                 ['Nivel',    'nivel',    maestrosMap.niveles   ?? []],
                 ['Estante',  'estante',  maestrosMap.estantes  ?? []],
-                ['Posición', 'posicion', POSICIONES],
               ] as [string, keyof typeof newDraft, string[]][]).map(([label, field, opts]) => (
                 <div key={field} className="flex items-center gap-3">
                   <label className="text-sm text-[#9a9a92] w-20 flex-shrink-0">{label}</label>
                   <select
                     value={newDraft[field] as string}
-                    onChange={e => setNewDraft(d => d ? { ...d, [field]: e.target.value } : d)}
+                    onChange={e => {
+                      const value = e.target.value
+                      setNewDraft(d => {
+                        if (!d) return d
+                        if (field !== 'estante') return { ...d, [field]: value }
+                        // al cambiar de estante, recalculamos las posiciones libres
+                        // y si la posición actual ya no está libre ahí, tomamos la primera disponible
+                        const disponibles = getPosicionesDisponibles(value)
+                        const posicion = disponibles.includes(d.posicion) ? d.posicion : (disponibles[0] ?? '')
+                        return { ...d, estante: value, posicion }
+                      })
+                    }}
                     className="flex-1 border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-1 focus:ring-[#3b82f6]"
                   >
                     {opts.map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
               ))}
+              {(() => {
+                const disponibles = getPosicionesDisponibles(newDraft.estante)
+                return (
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm text-[#9a9a92] w-20 flex-shrink-0">Posición</label>
+                    {disponibles.length > 0 ? (
+                      <select
+                        value={newDraft.posicion}
+                        onChange={e => setNewDraft(d => d ? { ...d, posicion: e.target.value } : d)}
+                        className="flex-1 border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-1 focus:ring-[#3b82f6]"
+                      >
+                        {disponibles.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    ) : (
+                      <p className="flex-1 text-xs text-[#f87171]">No hay posiciones libres en &quot;{newDraft.estante}&quot;.</p>
+                    )}
+                  </div>
+                )
+              })()}
               <div className="flex items-center gap-3">
                 <label className="text-sm text-[#9a9a92] w-20 flex-shrink-0">En uso</label>
                 <input type="checkbox" checked={newDraft.en_uso}
@@ -635,7 +697,7 @@ export default function FilamentosPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowAdd(false)} className="text-sm text-[#9a9a92] hover:text-[#d4d4cf] px-4 py-2">Cancelar</button>
-              <button onClick={handleAdd} disabled={saving === 'new'}
+              <button onClick={handleAdd} disabled={saving === 'new' || !newDraft.posicion}
                 className="bg-[#2563eb] hover:bg-[#1d4ed8] text-white text-sm font-medium px-5 py-2 rounded-lg transition-colors disabled:opacity-50">
                 {saving === 'new' ? 'Guardando…' : 'Agregar'}
               </button>
