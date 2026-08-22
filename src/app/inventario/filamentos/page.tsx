@@ -43,6 +43,16 @@ const POSICIONES = [
   'AT 11','AT 12','AT 13','AT 14','AT 15','AT 16','AT 17','AT 18','AT 19','AT 20','AT 21',
 ]
 
+// Cantidad máxima de posiciones (por prefijo AD/AT) que existen físicamente en cada estante.
+// Los estantes que no aparecen acá (ej. "Rack") usan el rango completo de POSICIONES.
+const CAPACIDAD_ESTANTE: Record<string, number> = {
+  'Estante Alto':  11,
+  'Estante Medio': 8,
+  'Estante Bajo':  11,
+}
+
+const numeroPosicion = (p: string) => parseInt(p.split(' ')[1] ?? '0', 10)
+
 const NIVEL_COLOR: Record<string, string> = {
   'Cerrado':      'bg-[#16223a] text-[#60a5fa]',
   'Lleno':        'bg-[#14291a] text-[#4ade80]',
@@ -185,32 +195,57 @@ export default function FilamentosPage() {
 
   // ─── Filamentos: filtrar + ordenar ───────────────────────────────────────
 
+  // Chequea todos los filtros activos salvo el que se pasa en `omitir` — así el propio filtro
+  // no se restringe a sí mismo cuando calculamos qué opciones mostrarle.
+  type CampoFiltro = 'estante' | 'material' | 'tipo' | 'marca' | 'color' | 'nivel'
+  const pasaFiltros = (f: Filamento, omitir?: CampoFiltro) => {
+    const q = search.toLowerCase()
+    const matchSearch = !q || [f.material, f.tipo, f.marca, f.color, f.estante, f.posicion]
+      .some(v => v.toLowerCase().includes(q))
+    return matchSearch
+      && (omitir === 'estante'  || !filterEstante  || f.estante  === filterEstante)
+      && (omitir === 'material' || !filterMaterial || f.material === filterMaterial)
+      && (omitir === 'tipo'     || !filterTipo     || f.tipo     === filterTipo)
+      && (omitir === 'marca'    || !filterMarca    || f.marca    === filterMarca)
+      && (omitir === 'color'    || !filterColor    || f.color    === filterColor)
+      && (omitir === 'nivel'    || !filterNivel    || f.nivel    === filterNivel)
+      && (!filterEnUso || f.en_uso)
+  }
+
+  // Opciones que le mostramos a cada select de filtro: solo los valores que existen en el
+  // inventario una vez aplicados el resto de los filtros activos (filtros "en cascada").
+  const getOpcionesFiltro = (campo: CampoFiltro) =>
+    Array.from(new Set(filamentos.filter(f => pasaFiltros(f, campo)).map(f => f[campo]))).sort((a, b) => a.localeCompare(b))
+
   const filtered = filamentos
-    .filter(f => {
-      const q = search.toLowerCase()
-      const matchSearch = !q || [f.material, f.tipo, f.marca, f.color, f.estante, f.posicion]
-        .some(v => v.toLowerCase().includes(q))
-      return matchSearch
-        && (!filterEstante || f.estante === filterEstante)
-        && (!filterMaterial || f.material === filterMaterial)
-        && (!filterTipo || f.tipo === filterTipo)
-        && (!filterMarca || f.marca === filterMarca)
-        && (!filterColor || f.color === filterColor)
-        && (!filterNivel || f.nivel === filterNivel)
-        && (!filterEnUso || f.en_uso)
-    })
+    .filter(f => pasaFiltros(f))
     .sort((a, b) => {
       const va = a[sortKey] ?? ''
       const vb = b[sortKey] ?? ''
       return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va)
     })
 
-  // Posiciones libres de un estante (opcionalmente incluye una posición aunque esté "ocupada",
-  // útil para no perder la selección actual al editar)
-  const getPosicionesDisponibles = (estante: string, incluir?: string) =>
-    POSICIONES.filter(p =>
-      p === incluir || !filamentos.some(f => f.estante === estante && f.posicion === p)
-    )
+  // Si al cambiar un filtro alguno de los otros queda con un valor que ya no existe entre las
+  // opciones disponibles, lo reseteamos a "Todos" en vez de dejarlo aplicado "a ciegas".
+  useEffect(() => {
+    if (filterEstante  && !getOpcionesFiltro('estante').includes(filterEstante))   setFilterEstante('')
+    if (filterMaterial && !getOpcionesFiltro('material').includes(filterMaterial)) setFilterMaterial('')
+    if (filterTipo     && !getOpcionesFiltro('tipo').includes(filterTipo))         setFilterTipo('')
+    if (filterMarca    && !getOpcionesFiltro('marca').includes(filterMarca))       setFilterMarca('')
+    if (filterColor    && !getOpcionesFiltro('color').includes(filterColor))       setFilterColor('')
+    if (filterNivel    && !getOpcionesFiltro('nivel').includes(filterNivel))       setFilterNivel('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filamentos, search, filterEstante, filterMaterial, filterTipo, filterMarca, filterColor, filterNivel, filterEnUso])
+
+  // Posiciones libres de un estante, respetando su capacidad física (opcionalmente incluye una
+  // posición aunque esté "ocupada", útil para no perder la selección actual al editar)
+  const getPosicionesDisponibles = (estante: string, incluir?: string) => {
+    const max = CAPACIDAD_ESTANTE[estante]
+    return POSICIONES.filter(p => {
+      if (max && numeroPosicion(p) > max) return false
+      return p === incluir || !filamentos.some(f => f.estante === estante && f.posicion === p)
+    })
+  }
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) setSortAsc(!sortAsc)
@@ -367,32 +402,32 @@ export default function FilamentosPage() {
             <select value={filterEstante} onChange={e => setFilterEstante(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los estantes</option>
-              {(maestrosMap.estantes ?? []).map(e => <option key={e}>{e}</option>)}
+              {getOpcionesFiltro('estante').map(e => <option key={e}>{e}</option>)}
             </select>
             <select value={filterMaterial} onChange={e => setFilterMaterial(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los materiales</option>
-              {(maestrosMap.materiales ?? []).map(m => <option key={m}>{m}</option>)}
+              {getOpcionesFiltro('material').map(m => <option key={m}>{m}</option>)}
             </select>
             <select value={filterTipo} onChange={e => setFilterTipo(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los tipos</option>
-              {(maestrosMap.tipos ?? []).map(t => <option key={t}>{t}</option>)}
+              {getOpcionesFiltro('tipo').map(t => <option key={t}>{t}</option>)}
             </select>
             <select value={filterMarca} onChange={e => setFilterMarca(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todas las marcas</option>
-              {(maestrosMap.marcas ?? []).map(m => <option key={m}>{m}</option>)}
+              {getOpcionesFiltro('marca').map(m => <option key={m}>{m}</option>)}
             </select>
             <select value={filterColor} onChange={e => setFilterColor(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los colores</option>
-              {(maestrosMap.colores ?? []).map(c => <option key={c}>{c}</option>)}
+              {getOpcionesFiltro('color').map(c => <option key={c}>{c}</option>)}
             </select>
             <select value={filterNivel} onChange={e => setFilterNivel(e.target.value)}
               className="border border-[#2a2a28] rounded-lg px-3 py-1.5 text-sm bg-[#1a1a18] focus:outline-none focus:ring-2 focus:ring-[#3b82f6]">
               <option value="">Todos los niveles</option>
-              {(maestrosMap.niveles ?? []).map(n => <option key={n}>{n}</option>)}
+              {getOpcionesFiltro('nivel').map(n => <option key={n}>{n}</option>)}
             </select>
             <button
               onClick={() => setFilterEnUso(!filterEnUso)}
