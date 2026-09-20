@@ -112,6 +112,8 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
 }) {
   const [busqueda, setBusqueda] = useState('')
   const [buscando, setBuscando] = useState(false)
+  const [creandoNombre, setCreandoNombre] = useState<string | null>(null)
+  const [precioNuevo, setPrecioNuevo] = useState(0)
 
   function update(id: string, patch: Partial<Componente>) { onChange(componentes.map(c => c.id === id ? { ...c, ...patch } : c)) }
   function remove(id: string) { onChange(componentes.filter(c => c.id !== id)) }
@@ -121,14 +123,25 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
     setBusqueda(''); setBuscando(false)
   }
 
-  async function crearYAgregar() {
-    const nombre = busqueda.trim()
-    if (!nombre) return
+  function iniciarCreacion() {
+    setCreandoNombre(busqueda.trim())
+    setPrecioNuevo(0)
+  }
+
+  function cancelarCreacion() {
+    setCreandoNombre(null)
+    setPrecioNuevo(0)
+  }
+
+  async function confirmarCreacion() {
+    if (!creandoNombre) return
     await supabase.from('producto_componentes_catalogo').insert({
-      nombre, precio_unitario: 0, categorias: categoriaActual ? [categoriaActual] : [],
+      nombre: creandoNombre, precio_unitario: precioNuevo, categorias: categoriaActual ? [categoriaActual] : [],
     })
     onCatalogoChanged()
-    agregarFila(nombre, 0)
+    agregarFila(creandoNombre, precioNuevo)
+    setCreandoNombre(null)
+    setPrecioNuevo(0)
   }
 
   async function guardarEnCatalogo(c: Componente) {
@@ -158,26 +171,50 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
           placeholder="Buscar en el catálogo o escribir uno nuevo..."
           value={busqueda}
           onFocus={() => setBuscando(true)}
-          onChange={e => { setBusqueda(e.target.value); setBuscando(true) }}
+          onChange={e => { setBusqueda(e.target.value); setBuscando(true); setCreandoNombre(null) }}
         />
         {buscando && (
-          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, zIndex: 5, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }}>
-            {sugeridos.map(item => (
-              <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const }}>
-                <span>{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
-              </button>
-            ))}
-            {busqueda.trim() && !yaExiste && (
-              <button onClick={crearYAgregar} style={{ display: 'block', width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const, fontWeight: 600 }}>
-                + Crear "{busqueda.trim()}" en el catálogo
-              </button>
-            )}
-            {sugeridos.length === 0 && !busqueda.trim() && (
-              <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>
-                {catalogo.length === 0 ? 'El catálogo está vacío — escribí un nombre para crear el primero.' : 'Escribí para buscar o crear un componente.'}
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, zIndex: 5, maxHeight: 260, overflowY: 'auto', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }}>
+            {creandoNombre ? (
+              <div style={{ padding: '12px' }}>
+                <div style={{ fontSize: 13, color: 'var(--color-text)', marginBottom: 8 }}>
+                  Nuevo componente: <strong>{creandoNombre}</strong>
+                </div>
+                <label style={{ ...S.label, marginBottom: 4 }}>Precio (se guarda en el catálogo)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', overflow: 'hidden', flex: 1 }}>
+                    <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderRight: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>$</span>
+                    <input type="number" autoFocus min={0} value={precioNuevo}
+                      onChange={e => setPrecioNuevo(Number(e.target.value))}
+                      onKeyDown={e => { if (e.key === 'Enter') confirmarCreacion() }}
+                      style={{ flex: 1, padding: '7px 10px', border: 'none', background: 'none', fontFamily: 'inherit', fontSize: 13, color: 'var(--color-text)', outline: 'none', width: 0 }} />
+                  </div>
+                  <button onClick={confirmarCreacion} style={{ padding: '7px 14px', borderRadius: 6, border: 'none', background: 'var(--color-brand)', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' as const }}>
+                    Crear y agregar
+                  </button>
+                  <button onClick={cancelarCreacion} style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
+                </div>
               </div>
+            ) : (
+              <>
+                {sugeridos.map(item => (
+                  <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const }}>
+                    <span>{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
+                  </button>
+                ))}
+                {busqueda.trim() && !yaExiste && (
+                  <button onClick={iniciarCreacion} style={{ display: 'block', width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const, fontWeight: 600 }}>
+                    + Crear "{busqueda.trim()}" en el catálogo
+                  </button>
+                )}
+                {sugeridos.length === 0 && !busqueda.trim() && (
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>
+                    {catalogo.length === 0 ? 'El catálogo está vacío — escribí un nombre para crear el primero.' : 'Escribí para buscar o crear un componente.'}
+                  </div>
+                )}
+                <button onClick={() => setBuscando(false)} style={{ display: 'block', width: '100%', padding: '6px 12px', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const }}>Cerrar</button>
+              </>
             )}
-            <button onClick={() => setBuscando(false)} style={{ display: 'block', width: '100%', padding: '6px 12px', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const }}>Cerrar</button>
           </div>
         )}
       </div>
