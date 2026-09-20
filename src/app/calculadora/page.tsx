@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { genId } from '@/lib/printCost'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -222,6 +223,11 @@ export default function CalculadoraPage() {
   const costoBase = subtotal + margenAbs
   // Costo por pieza individual — gramos/horas ingresados son el total de la tirada para "cantPiezas" unidades
   const costoPorPieza = cantPiezas > 0 ? costoBase / cantPiezas : costoBase
+  // Costo de impresión "bruto" por pieza (solo material + luz + amortización, sin margen de error ni insumos)
+  // — es el que se usa en la ficha de Productos.
+  const costoImpresionPieza = cantPiezas > 0
+    ? (costoFilamento + costoElectricidad + costoAmortizacion) / cantPiezas
+    : (costoFilamento + costoElectricidad + costoAmortizacion)
 
   const pct = (v: number) => costoBase > 0 ? (v / costoBase) * 100 : 0
 
@@ -495,6 +501,7 @@ export default function CalculadoraPage() {
             vida_util_hs: config.vida_util_hs,
             margen_error_pct: config.margen_error_pct,
             costo_produccion: costoPorPieza,
+            costo_impresion: costoImpresionPieza,
             precio_venta_sugerido: costoPorPieza * 3,
             insumos_usados: insumos.filter(i => i.activo).map(i => ({
               insumo_id: i.id, nombre: i.nombre, costo_por_pieza: i.costo_por_pieza,
@@ -513,7 +520,7 @@ type DatosCalculados = {
   gramos: number; horas: number; minutos: number; cantPiezas: number
   precio_kg: number; desperdicio_pct: number; precio_kwh: number; consumo_w: number
   costo_impresora: number; vida_util_hs: number; margen_error_pct: number
-  costo_produccion: number; precio_venta_sugerido: number
+  costo_produccion: number; costo_impresion: number; precio_venta_sugerido: number
   insumos_usados: { insumo_id: string; nombre: string; costo_por_pieza: number }[]
 }
 
@@ -556,6 +563,15 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
 
     let foto_url: string | null = null
 
+    // La ficha de Productos guarda los insumos activos de la calculadora como
+    // "componentes" editables (uno por unidad) — Pato puede después sumarles
+    // cable, portalámparas, caja, etc. directamente desde Productos.
+    const componentesIniciales = d.insumos_usados.map(i => ({
+      id: genId(), nombre: i.nombre, cantidad: 1, precio_unitario: i.costo_por_pieza,
+    }))
+    const costoComponentes = componentesIniciales.reduce((s, c) => s + c.cantidad * c.precio_unitario, 0)
+    const costoTotalBruto = d.costo_impresion + costoComponentes
+
     try {
       if (modoFoto === 'subir' && fotoFile) {
         const ext = fotoFile.name.split('.').pop()
@@ -591,7 +607,11 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
         costo_impresora: d.costo_impresora,
         vida_util_hs: d.vida_util_hs,
         margen_error_pct: d.margen_error_pct,
-        costo_produccion: d.costo_produccion,
+        componentes: componentesIniciales,
+        costo_impresion: d.costo_impresion,
+        costo_componentes: costoComponentes,
+        costo_total: costoTotalBruto,
+        costo_produccion: costoTotalBruto,
         precio_venta_sugerido: precioVenta,
         insumos_usados: d.insumos_usados,
       }
