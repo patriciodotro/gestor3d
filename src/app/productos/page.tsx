@@ -9,12 +9,15 @@ const $$ = (n: number) =>
 
 // ── Tipos ────────────────────────────────────────────────
 type Componente = { id: string; nombre: string; cantidad: number; precio_unitario: number }
+type Categoria = { id: string; nombre: string; orden: number }
+type ComponenteCatalogo = { id: string; nombre: string; precio_unitario: number; categorias: string[] }
 
 type Producto = {
   id: string
   nombre: string
   categoria: string | null
   precio: number
+  precio_mercadolibre: number | null
   stock: number
   notas: string | null
   foto_url: string | null
@@ -40,9 +43,10 @@ const SIN_CATEGORIA = 'Sin categoría'
 // ── Estilos compartidos ─────────────────────────────────
 const S = {
   card: { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 14, overflow: 'hidden' } as React.CSSProperties,
+  sectionCard: { background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 12, padding: 16, marginBottom: 16 } as React.CSSProperties,
   input: { width: '100%', padding: '7px 10px', fontSize: 14, border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', color: 'var(--color-text)', fontFamily: 'inherit' } as React.CSSProperties,
   label: { fontSize: 11, color: 'var(--color-muted)', display: 'block', marginBottom: 4, fontWeight: 500 } as React.CSSProperties,
-  sectionTitle: { fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 10 },
+  sectionTitle: { fontSize: 11, fontWeight: 600, color: 'var(--color-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.06em', marginBottom: 10 } as React.CSSProperties,
   btn: (v: 'default' | 'primary' | 'danger' = 'default') => ({
     padding: '7px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit',
     border: v === 'primary' ? 'none' : v === 'danger' ? '1px solid var(--color-accent-red-bg)' : '1px solid var(--color-border)',
@@ -84,57 +88,137 @@ function NumField({ label, value, onChange, suffix, prefix, step = 1, min = 0 }:
   )
 }
 
-// ── Editor de componentes / packaging (tabla dinámica) ──
-const COMPONENTES_SUGERIDOS = ['Cable', 'Portalámparas', 'Lamparita', 'Rosca', 'Caja', 'Etiqueta', 'Film', 'Papel panal']
+// ── Ganancia (precio - costo), usada junto a cada precio ─
+function GananciaMini({ precio, costo, dark = false }: { precio: number; costo: number; dark?: boolean }) {
+  const g = precio - costo
+  const pct = precio > 0 ? (g / precio) * 100 : 0
+  return (
+    <div style={{ textAlign: 'right' as const }}>
+      <div style={{ fontSize: 10, color: dark ? '#666' : 'var(--color-muted)' }}>Ganancia</div>
+      <div style={{ fontSize: 13, fontWeight: 600, color: g >= 0 ? '#4ade80' : (dark ? '#f87171' : 'var(--color-accent-red)') }}>
+        {$$(g)} {precio > 0 && <span style={{ color: dark ? '#666' : 'var(--color-muted)', fontWeight: 400 }}>({pct.toFixed(0)}%)</span>}
+      </div>
+    </div>
+  )
+}
 
-function ComponentesEditor({ componentes, onChange }: { componentes: Componente[]; onChange: (c: Componente[]) => void }) {
-  function update(id: string, patch: Partial<Componente>) {
-    onChange(componentes.map(c => c.id === id ? { ...c, ...patch } : c))
-  }
+// ── Editor de componentes: buscador/creador sobre el catálogo ──
+function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, onCatalogoChanged }: {
+  componentes: Componente[]
+  onChange: (c: Componente[]) => void
+  catalogo: ComponenteCatalogo[]
+  categoriaActual: string
+  onCatalogoChanged: () => void
+}) {
+  const [busqueda, setBusqueda] = useState('')
+  const [buscando, setBuscando] = useState(false)
+
+  function update(id: string, patch: Partial<Componente>) { onChange(componentes.map(c => c.id === id ? { ...c, ...patch } : c)) }
   function remove(id: string) { onChange(componentes.filter(c => c.id !== id)) }
-  function add(nombre = '') { onChange([...componentes, { id: genId(), nombre, cantidad: 1, precio_unitario: 0 }]) }
+
+  function agregarFila(nombre: string, precio_unitario: number) {
+    onChange([...componentes, { id: genId(), nombre, cantidad: 1, precio_unitario }])
+    setBusqueda(''); setBuscando(false)
+  }
+
+  async function crearYAgregar() {
+    const nombre = busqueda.trim()
+    if (!nombre) return
+    await supabase.from('producto_componentes_catalogo').insert({
+      nombre, precio_unitario: 0, categorias: categoriaActual ? [categoriaActual] : [],
+    })
+    onCatalogoChanged()
+    agregarFila(nombre, 0)
+  }
+
+  async function guardarEnCatalogo(c: Componente) {
+    if (!c.nombre.trim()) return
+    await supabase.from('producto_componentes_catalogo').insert({
+      nombre: c.nombre.trim(), precio_unitario: c.precio_unitario, categorias: categoriaActual ? [categoriaActual] : [],
+    })
+    onCatalogoChanged()
+  }
+
+  const sugeridos = catalogo.filter(item => {
+    const matchTexto = !busqueda || item.nombre.toLowerCase().includes(busqueda.toLowerCase())
+    const matchCategoria = item.categorias.length === 0 || (!!categoriaActual && item.categorias.includes(categoriaActual))
+    return matchTexto && matchCategoria
+  }).slice(0, 8)
+  const yaExiste = catalogo.some(item => item.nombre.trim().toLowerCase() === busqueda.trim().toLowerCase())
+  const nombresCatalogo = new Set(catalogo.map(c => c.nombre.trim().toLowerCase()))
+
   const total = componentes.reduce((s, c) => s + c.cantidad * c.precio_unitario, 0)
 
   return (
     <div>
+      {/* Buscador / picker sobre el catálogo */}
+      <div style={{ position: 'relative', marginBottom: 14 }}>
+        <input
+          style={S.input}
+          placeholder="Buscar en el catálogo o escribir uno nuevo..."
+          value={busqueda}
+          onFocus={() => setBuscando(true)}
+          onChange={e => { setBusqueda(e.target.value); setBuscando(true) }}
+        />
+        {buscando && (
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 8, zIndex: 5, maxHeight: 220, overflowY: 'auto', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }}>
+            {sugeridos.map(item => (
+              <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const }}>
+                <span>{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
+              </button>
+            ))}
+            {busqueda.trim() && !yaExiste && (
+              <button onClick={crearYAgregar} style={{ display: 'block', width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const, fontWeight: 600 }}>
+                + Crear "{busqueda.trim()}" en el catálogo
+              </button>
+            )}
+            {sugeridos.length === 0 && !busqueda.trim() && (
+              <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>
+                {catalogo.length === 0 ? 'El catálogo está vacío — escribí un nombre para crear el primero.' : 'Escribí para buscar o crear un componente.'}
+              </div>
+            )}
+            <button onClick={() => setBuscando(false)} style={{ display: 'block', width: '100%', padding: '6px 12px', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const }}>Cerrar</button>
+          </div>
+        )}
+      </div>
+
       {componentes.length === 0 ? (
         <p style={{ fontSize: 12, color: 'var(--color-muted)', marginBottom: 10 }}>
           Sumá cada parte extra de la ficha: cable, portalámparas, caja, etiqueta, empaquetado...
         </p>
       ) : (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 60px 100px 90px 24px', gap: 8, marginBottom: 6 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 55px 90px 85px 22px 22px', gap: 6, marginBottom: 6 }}>
             <span style={S.label}>Componente</span>
             <span style={S.label}>Cant.</span>
             <span style={S.label}>Precio u.</span>
             <span style={{ ...S.label, textAlign: 'right' as const }}>Subtotal</span>
-            <span />
+            <span /><span />
           </div>
-          {componentes.map(c => (
-            <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 60px 100px 90px 24px', gap: 8, alignItems: 'center', marginBottom: 8 }}>
-              <input style={S.input} value={c.nombre} onChange={e => update(c.id, { nombre: e.target.value })} placeholder="Ej: Portalámparas" />
-              <input type="number" style={S.input} value={c.cantidad} min={0} onChange={e => update(c.id, { cantidad: Number(e.target.value) })} />
-              <input type="number" style={S.input} value={c.precio_unitario} min={0} onChange={e => update(c.id, { precio_unitario: Number(e.target.value) })} />
-              <span style={{ fontSize: 12, color: 'var(--color-text)', textAlign: 'right' as const }}>{$$(c.cantidad * c.precio_unitario)}</span>
-              <button onClick={() => remove(c.id)} style={{ background: 'none', border: 'none', color: 'var(--color-accent-red)', cursor: 'pointer', fontSize: 15 }}>✕</button>
-            </div>
-          ))}
+          {componentes.map(c => {
+            const enCatalogo = nombresCatalogo.has(c.nombre.trim().toLowerCase())
+            return (
+              <div key={c.id} style={{ display: 'grid', gridTemplateColumns: '1fr 55px 90px 85px 22px 22px', gap: 6, alignItems: 'center', marginBottom: 8 }}>
+                <input style={S.input} value={c.nombre} onChange={e => update(c.id, { nombre: e.target.value })} placeholder="Ej: Portalámparas" />
+                <input type="number" style={S.input} value={c.cantidad} min={0} onChange={e => update(c.id, { cantidad: Number(e.target.value) })} />
+                <input type="number" style={S.input} value={c.precio_unitario} min={0} onChange={e => update(c.id, { precio_unitario: Number(e.target.value) })} />
+                <span style={{ fontSize: 12, color: 'var(--color-text)', textAlign: 'right' as const }}>{$$(c.cantidad * c.precio_unitario)}</span>
+                {!enCatalogo && c.nombre.trim() ? (
+                  <button title="Guardar en el catálogo" onClick={() => guardarEnCatalogo(c)} style={{ background: 'none', border: 'none', color: 'var(--color-brand)', cursor: 'pointer', fontSize: 14 }}>＋</button>
+                ) : <span />}
+                <button title="Quitar" onClick={() => remove(c.id)} style={{ background: 'none', border: 'none', color: 'var(--color-accent-red)', cursor: 'pointer', fontSize: 15 }}>✕</button>
+              </div>
+            )
+          })}
         </>
       )}
 
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginTop: 4, marginBottom: componentes.length > 0 ? 10 : 0 }}>
-        {COMPONENTES_SUGERIDOS.map(s => (
-          <button key={s} onClick={() => add(s)} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 12, border: '1px dashed var(--color-border)', background: 'transparent', color: 'var(--color-muted)', cursor: 'pointer', fontFamily: 'inherit' }}>
-            + {s}
-          </button>
-        ))}
-        <button onClick={() => add('')} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 12, border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
-          + Otro
-        </button>
-      </div>
+      <button onClick={() => onChange([...componentes, { id: genId(), nombre: '', cantidad: 1, precio_unitario: 0 }])} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 12, border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+        + Fila libre
+      </button>
 
       {componentes.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, paddingTop: 8, borderTop: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 600, paddingTop: 8, marginTop: 10, borderTop: '1px solid var(--color-border)', color: 'var(--color-text)' }}>
           <span>Total componentes</span><span>{$$(total)}</span>
         </div>
       )}
@@ -149,6 +233,7 @@ type FormState = {
   notas: string
   stock: number
   precio: number
+  precioML: number
   gramos: number
   horas: number
   minutos: number
@@ -164,7 +249,7 @@ type FormState = {
 function formFromProducto(p: Producto | null): FormState {
   if (!p) {
     return {
-      nombre: '', categoria: '', notas: '', stock: 0, precio: 0,
+      nombre: '', categoria: '', notas: '', stock: 0, precio: 0, precioML: 0,
       gramos: 100, horas: 2, minutos: 0, piezas: 1,
       filamentoTipo: 'variable', filMaterial: 'PLA', filColor: '', filMarca: '',
       componentes: [], foto_url: null,
@@ -175,7 +260,7 @@ function formFromProducto(p: Producto | null): FormState {
     : (p.insumos_usados || []).map(i => ({ id: genId(), nombre: i.nombre, cantidad: 1, precio_unitario: i.costo_por_pieza }))
   return {
     nombre: p.nombre, categoria: p.categoria || '', notas: p.notas || '',
-    stock: p.stock || 0, precio: p.precio || 0,
+    stock: p.stock || 0, precio: p.precio || 0, precioML: p.precio_mercadolibre || 0,
     gramos: p.gramos || 0, horas: p.tiempo_horas || 0, minutos: p.minutos_impresion || 0, piezas: p.cantidad_piezas || 1,
     filamentoTipo: p.filamento_tipo || 'variable',
     filMaterial: p.filamento_material || 'PLA', filColor: p.filamento_color || '', filMarca: p.filamento_marca || '',
@@ -185,12 +270,14 @@ function formFromProducto(p: Producto | null): FormState {
 }
 
 // ── Modal: ver / editar / crear producto ────────────────
-function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDeleted }: {
+function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDeleted, onCatalogosChanged }: {
   producto: Producto | null
-  categoriasExistentes: string[]
+  categorias: Categoria[]
+  catalogo: ComponenteCatalogo[]
   onClose: () => void
   onSaved: () => void
   onDeleted: () => void
+  onCatalogosChanged: () => void
 }) {
   const esNuevo = producto === null
   const [editing, setEditing] = useState(esNuevo)
@@ -202,6 +289,9 @@ function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDel
   const [fotoUrlManual, setFotoUrlManual] = useState('')
   const [modoFoto, setModoFoto] = useState<'subir' | 'url'>('subir')
 
+  const [agregandoCategoria, setAgregandoCategoria] = useState(false)
+  const [nuevaCategoriaTexto, setNuevaCategoriaTexto] = useState('')
+
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
@@ -212,8 +302,6 @@ function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDel
   const costoImpresionUnit = form.piezas > 0 ? desglose.total / form.piezas : desglose.total
   const costoComponentes = form.componentes.reduce((s, c) => s + c.cantidad * c.precio_unitario, 0)
   const costoTotal = costoImpresionUnit + costoComponentes
-  const ganancia = form.precio - costoTotal
-  const pctGanancia = form.precio > 0 ? (ganancia / form.precio) * 100 : 0
 
   function resetForm() {
     setForm(formFromProducto(producto))
@@ -229,6 +317,16 @@ function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDel
   function handleRemoveFotoNueva() {
     if (fotoPreview) URL.revokeObjectURL(fotoPreview)
     setFotoFile(null); setFotoPreview(null)
+  }
+
+  async function confirmarNuevaCategoria() {
+    const nombre = nuevaCategoriaTexto.trim()
+    if (!nombre) { setAgregandoCategoria(false); return }
+    const { error: catErr } = await supabase.from('producto_categorias').insert({ nombre })
+    if (!catErr) onCatalogosChanged()
+    set('categoria', nombre)
+    setAgregandoCategoria(false)
+    setNuevaCategoriaTexto('')
   }
 
   async function handleGuardar() {
@@ -254,6 +352,7 @@ function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDel
         nombre: form.nombre.trim(),
         categoria: form.categoria.trim() || null,
         precio: form.precio,
+        precio_mercadolibre: form.precioML,
         stock: form.stock,
         notas: form.notas.trim() || null,
         foto_url,
@@ -300,280 +399,459 @@ function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDel
     onDeleted()
   }
 
-  const inputStyle = S.input
-  const labelStyle = S.label
-
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 20 }}
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60, padding: 20 }}
       onClick={onClose}>
+      <style>{`
+        .pm-grid { display: grid; grid-template-columns: 280px 1fr; gap: 28px; }
+        @media (max-width: 720px) { .pm-grid { grid-template-columns: 1fr; } }
+      `}</style>
       <div
-        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, width: 600, maxWidth: '94vw', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, width: 'min(1020px, 96vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column' as const }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '20px 24px 0' }}>
-          <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
-            {esNuevo ? 'Nuevo producto' : editing ? 'Editar producto' : form.nombre || 'Producto'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', padding: '22px 28px', borderBottom: '1px solid var(--color-border)', flexShrink: 0 }}>
+          <h2 style={{ fontSize: 19, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>
+            {esNuevo ? 'Nuevo producto' : editing ? `Editando · ${form.nombre || 'producto'}` : (form.nombre || 'Producto')}
           </h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 20, cursor: 'pointer' }}>✕</button>
         </div>
 
-        <div style={{ padding: '16px 24px 24px' }}>
+        <div style={{ padding: '24px 28px', overflowY: 'auto', flex: 1 }}>
           {error && (
-            <div style={{ background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 14 }}>
+            <div style={{ background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)', padding: '8px 12px', borderRadius: 8, fontSize: 12, marginBottom: 16 }}>
               {error}
             </div>
           )}
 
-          {!editing ? (
-            // ═══ MODO VER: ficha de solo lectura ═══
+          <div className="pm-grid">
+            {/* ═══ COLUMNA IZQUIERDA: foto + datos generales ═══ */}
             <div>
-              {form.foto_url && (
-                <img src={form.foto_url} alt={form.nombre} style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', borderRadius: 10, marginBottom: 16 }} />
-              )}
-
-              {form.categoria && (
-                <span style={{ fontSize: 10, padding: '2px 8px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>
-                  {form.categoria}
-                </span>
-              )}
-              {form.notas && <p style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 10, lineHeight: 1.5 }}>{form.notas}</p>}
-
-              {/* Receta */}
-              <div style={{ marginTop: 16, padding: '14px 16px', background: 'var(--color-surface-2)', borderRadius: 10 }}>
-                <div style={S.sectionTitle}>Receta de impresión</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
-                  <div><span style={{ color: 'var(--color-muted)' }}>Gramos:</span> <strong style={{ color: 'var(--color-text)' }}>{form.gramos}g</strong></div>
-                  <div><span style={{ color: 'var(--color-muted)' }}>Tiempo:</span> <strong style={{ color: 'var(--color-text)' }}>{form.horas}h {form.minutos}m</strong></div>
-                  <div><span style={{ color: 'var(--color-muted)' }}>Piezas por tirada:</span> <strong style={{ color: 'var(--color-text)' }}>{form.piezas}</strong></div>
-                  <div><span style={{ color: 'var(--color-muted)' }}>Stock:</span> <strong style={{ color: 'var(--color-text)' }}>{form.stock}</strong></div>
-                </div>
-                <div style={{ marginTop: 10, fontSize: 13 }}>
-                  <span style={{ color: 'var(--color-muted)' }}>Filamento:</span>{' '}
-                  {form.filamentoTipo === 'fijo' ? (
-                    <strong style={{ color: 'var(--color-text)' }}>{form.filMaterial} {form.filColor} ({form.filMarca})</strong>
-                  ) : (
-                    <strong style={{ color: 'var(--color-accent-purple)' }}>A elección del cliente</strong>
+              {!editing ? (
+                <>
+                  <div style={{ width: '100%', aspectRatio: '1', borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                    {form.foto_url ? (
+                      <img src={form.foto_url} alt={form.nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : <span style={{ fontSize: 40, opacity: 0.3 }}>🧊</span>}
+                  </div>
+                  {form.categoria && (
+                    <span style={{ fontSize: 10, padding: '3px 9px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)', textTransform: 'uppercase' as const, letterSpacing: '0.04em' }}>
+                      {form.categoria}
+                    </span>
                   )}
-                </div>
-              </div>
-
-              {/* Componentes */}
-              <div style={{ marginTop: 16 }}>
-                <div style={S.sectionTitle}>Componentes / packaging</div>
-                {form.componentes.length === 0 ? (
-                  <p style={{ fontSize: 13, color: 'var(--color-muted)' }}>Sin componentes cargados.</p>
-                ) : (
-                  form.componentes.map(c => (
-                    <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
-                      <span style={{ color: 'var(--color-text)' }}>{c.nombre} {c.cantidad > 1 && <span style={{ color: 'var(--color-muted)' }}>× {c.cantidad}</span>}</span>
-                      <span style={{ color: 'var(--color-muted)' }}>{$$(c.cantidad * c.precio_unitario)}</span>
-                    </div>
-                  ))
-                )}
-              </div>
-
-              {/* Costos */}
-              <div style={{ marginTop: 16, padding: '14px 16px', background: 'var(--color-surface-2)', borderRadius: 10 }}>
-                <div style={S.sectionTitle}>Costo bruto (sin ganancia)</div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}>
-                  <span style={{ color: 'var(--color-muted)' }}>Impresión (material + luz + amortización)</span>
-                  <span style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}>
-                  <span style={{ color: 'var(--color-muted)' }}>Componentes</span>
-                  <span style={{ color: 'var(--color-text)' }}>{$$(costoComponentes)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, padding: '8px 0 0', marginTop: 6, borderTop: '1px solid var(--color-border)' }}>
-                  <span style={{ color: 'var(--color-text)' }}>Costo total</span>
-                  <span style={{ color: 'var(--color-text)' }}>{$$(costoTotal)}</span>
-                </div>
-              </div>
-
-              <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--color-border)' }}>
-                <div>
-                  <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>Ganancia estimada</div>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: ganancia >= 0 ? '#4ade80' : 'var(--color-accent-red)' }}>
-                    {$$(ganancia)} {form.precio > 0 && <span style={{ color: 'var(--color-muted)', fontWeight: 400 }}>({pctGanancia.toFixed(0)}%)</span>}
+                  <div style={{ marginTop: 10, fontSize: 13, color: 'var(--color-muted)' }}>Stock: <strong style={{ color: 'var(--color-text)' }}>{form.stock}</strong></div>
+                  {form.notas && <p style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 10, lineHeight: 1.5 }}>{form.notas}</p>}
+                </>
+              ) : (
+                <>
+                  <div style={{ width: '100%', aspectRatio: '1', borderRadius: 12, overflow: 'hidden', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 10 }}>
+                    {(fotoPreview || form.foto_url) ? (
+                      <img src={fotoPreview || form.foto_url || ''} alt="foto" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : <span style={{ fontSize: 40, opacity: 0.3 }}>🧊</span>}
                   </div>
-                </div>
-                <div style={{ textAlign: 'right' as const }}>
-                  <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>Precio de venta</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-brand)' }}>{$$(form.precio)}</div>
-                </div>
-              </div>
-
-              <div style={{ display: 'flex', gap: 8, marginTop: 16, justifyContent: 'flex-end' }}>
-                {deleteConfirm ? (
-                  <>
-                    <span style={{ fontSize: 12, color: 'var(--color-muted)', alignSelf: 'center' }}>¿Eliminar producto?</span>
-                    <button style={S.btn('danger')} onClick={handleEliminar}>Sí, eliminar</button>
-                    <button style={S.btn()} onClick={() => setDeleteConfirm(false)}>Cancelar</button>
-                  </>
-                ) : (
-                  <>
-                    <button style={S.btn('danger')} onClick={() => setDeleteConfirm(true)}>Eliminar</button>
-                    <button style={S.btn('primary')} onClick={() => setEditing(true)}>✎ Editar</button>
-                  </>
-                )}
-              </div>
-            </div>
-          ) : (
-            // ═══ MODO EDITAR / NUEVO ═══
-            <div style={{ display: 'grid', gap: 18 }}>
-              {/* Datos generales */}
-              <div>
-                <div style={S.sectionTitle}>Datos generales</div>
-                <div style={{ display: 'grid', gap: 12 }}>
-                  <div>
-                    <label style={labelStyle}>Nombre del producto *</label>
-                    <input style={inputStyle} value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Lámpara hexagonal grande" />
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                    {(['subir', 'url'] as const).map(m => (
+                      <button key={m} onClick={() => { setModoFoto(m); if (m === 'url') handleRemoveFotoNueva() }} style={{
+                        flex: 1, padding: '5px 0', borderRadius: 6, fontSize: 11, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
+                        background: modoFoto === m ? 'var(--color-brand)' : 'transparent',
+                        color: modoFoto === m ? '#fff' : 'var(--color-text)',
+                      }}>
+                        {m === 'subir' ? 'Subir archivo' : 'Pegar URL'}
+                      </button>
+                    ))}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div>
-                      <label style={labelStyle}>Categoría</label>
-                      <input style={inputStyle} list="categorias-existentes" value={form.categoria} onChange={e => set('categoria', e.target.value)} placeholder="Ej: Lámparas, Macetas..." />
-                      <datalist id="categorias-existentes">
-                        {categoriasExistentes.map(c => <option key={c} value={c} />)}
-                      </datalist>
-                    </div>
-                    <div>
-                      <label style={labelStyle}>Stock</label>
-                      <input type="number" style={inputStyle} value={form.stock} onChange={e => set('stock', Number(e.target.value))} />
-                    </div>
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Notas (opcional)</label>
-                    <textarea style={{ ...inputStyle, minHeight: 56, resize: 'vertical' as const }} value={form.notas} onChange={e => set('notas', e.target.value)} placeholder="Detalles de la receta, variantes, etc." />
-                  </div>
-                </div>
-              </div>
-
-              {/* Foto */}
-              <div>
-                <div style={S.sectionTitle}>Foto</div>
-                {form.foto_url && !fotoPreview && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-                    <img src={form.foto_url} alt="actual" style={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 8 }} />
-                    <span style={{ fontSize: 12, color: 'var(--color-muted)' }}>Foto actual — subí una nueva o pegá una URL para reemplazarla.</span>
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                  {(['subir', 'url'] as const).map(m => (
-                    <button key={m} onClick={() => { setModoFoto(m); if (m === 'url') handleRemoveFotoNueva() }} style={{
-                      padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
-                      background: modoFoto === m ? 'var(--color-brand)' : 'transparent',
-                      color: modoFoto === m ? '#fff' : 'var(--color-text)',
-                    }}>
-                      {m === 'subir' ? 'Subir archivo' : 'Pegar URL'}
-                    </button>
-                  ))}
-                </div>
-                {modoFoto === 'subir' ? (
-                  <>
-                    <input type="file" accept="image/*" onChange={handleFileChange} style={{ fontSize: 13, color: 'var(--color-muted)' }} />
-                    {fotoPreview && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
-                        <img src={fotoPreview} alt="preview" style={{ width: 80, height: 80, objectFit: 'cover', borderRadius: 8 }} />
-                        <button onClick={handleRemoveFotoNueva} style={{ padding: '5px 10px', borderRadius: 6, fontSize: 12, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid var(--color-accent-red-bg)', background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)' }}>
-                          ✕ Quitar
+                  {modoFoto === 'subir' ? (
+                    <>
+                      <input type="file" accept="image/*" onChange={handleFileChange} style={{ fontSize: 12, color: 'var(--color-muted)', width: '100%' }} />
+                      {fotoPreview && (
+                        <button onClick={handleRemoveFotoNueva} style={{ marginTop: 6, padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', border: '1px solid var(--color-accent-red-bg)', background: 'var(--color-accent-red-bg)', color: 'var(--color-accent-red)' }}>
+                          ✕ Quitar foto nueva
                         </button>
+                      )}
+                    </>
+                  ) : (
+                    <input style={S.input} value={fotoUrlManual} onChange={e => setFotoUrlManual(e.target.value)} placeholder="https://..." />
+                  )}
+
+                  <div style={{ marginTop: 18, display: 'grid', gap: 12 }}>
+                    <div>
+                      <label style={S.label}>Nombre del producto *</label>
+                      <input style={S.input} value={form.nombre} onChange={e => set('nombre', e.target.value)} placeholder="Ej: Lámpara hexagonal grande" />
+                    </div>
+                    <div>
+                      <label style={S.label}>Categoría</label>
+                      {agregandoCategoria ? (
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <input style={S.input} autoFocus value={nuevaCategoriaTexto}
+                            onChange={e => setNuevaCategoriaTexto(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') confirmarNuevaCategoria() }}
+                            placeholder="Nombre de categoría" />
+                          <button style={S.btn('primary')} onClick={confirmarNuevaCategoria}>OK</button>
+                        </div>
+                      ) : (
+                        <select style={S.input} value={form.categoria} onChange={e => {
+                          if (e.target.value === '__nueva__') setAgregandoCategoria(true)
+                          else set('categoria', e.target.value)
+                        }}>
+                          <option value="">Sin categoría</option>
+                          {categorias.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                          <option value="__nueva__">+ Crear nueva categoría...</option>
+                        </select>
+                      )}
+                    </div>
+                    <div>
+                      <label style={S.label}>Stock</label>
+                      <input type="number" style={S.input} value={form.stock} onChange={e => set('stock', Number(e.target.value))} />
+                    </div>
+                    <div>
+                      <label style={S.label}>Notas (opcional)</label>
+                      <textarea style={{ ...S.input, minHeight: 70, resize: 'vertical' as const }} value={form.notas} onChange={e => set('notas', e.target.value)} placeholder="Detalles de la receta, variantes, etc." />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* ═══ COLUMNA DERECHA: receta / componentes / costos ═══ */}
+            <div>
+              {!editing ? (
+                <>
+                  <div style={S.sectionCard}>
+                    <div style={S.sectionTitle}>Receta de impresión</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
+                      <div><span style={{ color: 'var(--color-muted)' }}>Gramos:</span> <strong style={{ color: 'var(--color-text)' }}>{form.gramos}g</strong></div>
+                      <div><span style={{ color: 'var(--color-muted)' }}>Tiempo:</span> <strong style={{ color: 'var(--color-text)' }}>{form.horas}h {form.minutos}m</strong></div>
+                      <div><span style={{ color: 'var(--color-muted)' }}>Piezas por tirada:</span> <strong style={{ color: 'var(--color-text)' }}>{form.piezas}</strong></div>
+                      <div>
+                        <span style={{ color: 'var(--color-muted)' }}>Filamento:</span>{' '}
+                        {form.filamentoTipo === 'fijo' ? (
+                          <strong style={{ color: 'var(--color-text)' }}>{form.filMaterial} {form.filColor}</strong>
+                        ) : (
+                          <strong style={{ color: 'var(--color-accent-purple)' }}>A elección</strong>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={S.sectionCard}>
+                    <div style={S.sectionTitle}>Componentes / packaging</div>
+                    {form.componentes.length === 0 ? (
+                      <p style={{ fontSize: 13, color: 'var(--color-muted)' }}>Sin componentes cargados.</p>
+                    ) : (
+                      form.componentes.map(c => (
+                        <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--color-border)' }}>
+                          <span style={{ color: 'var(--color-text)' }}>{c.nombre} {c.cantidad > 1 && <span style={{ color: 'var(--color-muted)' }}>× {c.cantidad}</span>}</span>
+                          <span style={{ color: 'var(--color-muted)' }}>{$$(c.cantidad * c.precio_unitario)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div style={S.sectionCard}>
+                    <div style={S.sectionTitle}>Costo bruto (sin ganancia)</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}>
+                      <span style={{ color: 'var(--color-muted)' }}>Impresión (material + luz + amortización)</span>
+                      <span style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, padding: '3px 0' }}>
+                      <span style={{ color: 'var(--color-muted)' }}>Componentes</span>
+                      <span style={{ color: 'var(--color-text)' }}>{$$(costoComponentes)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, padding: '8px 0 0', marginTop: 6, borderTop: '1px solid var(--color-border)' }}>
+                      <span style={{ color: 'var(--color-text)' }}>Costo total</span>
+                      <span style={{ color: 'var(--color-text)' }}>{$$(costoTotal)}</span>
+                    </div>
+                  </div>
+
+                  <div style={{ ...S.sectionCard, marginBottom: 0 }}>
+                    <div style={S.sectionTitle}>Precios de venta</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>Venta directa</div>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-brand)' }}>{$$(form.precio)}</div>
+                        </div>
+                        <GananciaMini precio={form.precio} costo={costoTotal} />
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>Mercado Libre</div>
+                          <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--color-accent-yellow)' }}>{form.precioML > 0 ? $$(form.precioML) : '—'}</div>
+                        </div>
+                        {form.precioML > 0 && <GananciaMini precio={form.precioML} costo={costoTotal} />}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, marginTop: 18, justifyContent: 'flex-end' }}>
+                    {deleteConfirm ? (
+                      <>
+                        <span style={{ fontSize: 12, color: 'var(--color-muted)', alignSelf: 'center' }}>¿Eliminar producto?</span>
+                        <button style={S.btn('danger')} onClick={handleEliminar}>Sí, eliminar</button>
+                        <button style={S.btn()} onClick={() => setDeleteConfirm(false)}>Cancelar</button>
+                      </>
+                    ) : (
+                      <>
+                        <button style={S.btn('danger')} onClick={() => setDeleteConfirm(true)}>Eliminar</button>
+                        <button style={S.btn('primary')} onClick={() => setEditing(true)}>✎ Editar</button>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={S.sectionCard}>
+                    <div style={S.sectionTitle}>Receta de impresión</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
+                      <NumField label="Gramos (tirada)" value={form.gramos} onChange={v => set('gramos', v)} suffix="g" />
+                      <NumField label="Horas" value={form.horas} onChange={v => set('horas', v)} suffix="hs" />
+                      <NumField label="Minutos" value={form.minutos} onChange={v => set('minutos', v)} suffix="min" />
+                      <NumField label="Piezas en la tirada" value={form.piezas} onChange={v => set('piezas', v)} min={1} />
+                    </div>
+
+                    <label style={S.label}>Filamento / color</label>
+                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+                      <button onClick={() => set('filamentoTipo', 'variable')} style={{
+                        flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
+                        background: form.filamentoTipo === 'variable' ? 'var(--color-accent-purple)' : 'transparent',
+                        color: form.filamentoTipo === 'variable' ? '#1a1a18' : 'var(--color-text)',
+                      }}>
+                        A elección del cliente
+                      </button>
+                      <button onClick={() => set('filamentoTipo', 'fijo')} style={{
+                        flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
+                        background: form.filamentoTipo === 'fijo' ? 'var(--color-accent-blue)' : 'transparent',
+                        color: form.filamentoTipo === 'fijo' ? '#1a1a18' : 'var(--color-text)',
+                      }}>
+                        Color fijo
+                      </button>
+                    </div>
+                    {form.filamentoTipo === 'fijo' && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                        <input style={S.input} value={form.filMaterial} onChange={e => set('filMaterial', e.target.value)} placeholder="Material" />
+                        <input style={S.input} value={form.filColor} onChange={e => set('filColor', e.target.value)} placeholder="Color" />
+                        <input style={S.input} value={form.filMarca} onChange={e => set('filMarca', e.target.value)} placeholder="Marca" />
                       </div>
                     )}
-                  </>
-                ) : (
-                  <input style={inputStyle} value={fotoUrlManual} onChange={e => setFotoUrlManual(e.target.value)} placeholder="https://..." />
-                )}
-              </div>
 
-              {/* Receta de impresión */}
-              <div>
-                <div style={S.sectionTitle}>Receta de impresión</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
-                  <NumField label="Gramos (tirada)" value={form.gramos} onChange={v => set('gramos', v)} suffix="g" />
-                  <NumField label="Horas" value={form.horas} onChange={v => set('horas', v)} suffix="hs" />
-                  <NumField label="Minutos" value={form.minutos} onChange={v => set('minutos', v)} suffix="min" />
-                  <NumField label="Piezas en la tirada" value={form.piezas} onChange={v => set('piezas', v)} min={1} />
-                </div>
+                    <div style={{ padding: '8px 12px', background: 'var(--color-surface)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
+                      Costo de impresión por pieza (bruto): <strong style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</strong>
+                      <br />
+                      <span style={{ fontSize: 11 }}>
+                        {desglose.gramosConDesperdicio.toFixed(0)}g · {desglose.tiempoHs.toFixed(1)}hs · filamento {$$(desglose.costoFilamento)} + luz {$$(desglose.costoElectricidad)} + amortización {$$(desglose.costoAmortizacion)}, dividido en {form.piezas} {form.piezas === 1 ? 'pieza' : 'piezas'}.
+                      </span>
+                      <br />
+                      <span style={{ fontSize: 11 }}>Usa los valores ($/kg, $/kWh, amortización) configurados en la <Link href="/calculadora" style={{ color: 'var(--color-brand)' }}>Calculadora</Link>.</span>
+                    </div>
+                  </div>
 
-                <div>
-                  <label style={labelStyle}>Filamento / color</label>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                    <button onClick={() => set('filamentoTipo', 'variable')} style={{
-                      flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
-                      background: form.filamentoTipo === 'variable' ? 'var(--color-accent-purple)' : 'transparent',
-                      color: form.filamentoTipo === 'variable' ? '#1a1a18' : 'var(--color-text)',
-                    }}>
-                      A elección del cliente
+                  <div style={S.sectionCard}>
+                    <div style={S.sectionTitle}>Componentes / packaging</div>
+                    <ComponentesSection
+                      componentes={form.componentes}
+                      onChange={c => set('componentes', c)}
+                      catalogo={catalogo}
+                      categoriaActual={form.categoria}
+                      onCatalogoChanged={onCatalogosChanged}
+                    />
+                  </div>
+
+                  <div style={{ padding: '16px 18px', background: '#111110', borderRadius: 12, marginBottom: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', padding: '2px 0' }}>
+                      <span>Costo impresión</span><span>{$$(costoImpresionUnit)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', padding: '2px 0' }}>
+                      <span>Costo componentes</span><span>{$$(costoComponentes)}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', padding: '6px 0 0', marginTop: 4, borderTop: '1px solid #2a2a28' }}>
+                      <span>Costo total (bruto, sin ganancia)</span><span>{$$(costoTotal)}</span>
+                    </div>
+
+                    <div style={{ marginTop: 16, display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
+                      <NumField label="Precio de venta directa" value={form.precio} onChange={v => set('precio', v)} prefix="$" step={100} />
+                      <GananciaMini precio={form.precio} costo={costoTotal} dark />
+                    </div>
+                    <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
+                      <NumField label="Precio Mercado Libre" value={form.precioML} onChange={v => set('precioML', v)} prefix="$" step={100} />
+                      <GananciaMini precio={form.precioML} costo={costoTotal} dark />
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 18 }}>
+                    <button style={S.btn()} onClick={() => { if (esNuevo) onClose(); else { resetForm(); setEditing(false) } }}>
+                      Cancelar
                     </button>
-                    <button onClick={() => set('filamentoTipo', 'fijo')} style={{
-                      flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
-                      background: form.filamentoTipo === 'fijo' ? 'var(--color-accent-blue)' : 'transparent',
-                      color: form.filamentoTipo === 'fijo' ? '#1a1a18' : 'var(--color-text)',
-                    }}>
-                      Color fijo
+                    <button style={S.btn('primary')} onClick={handleGuardar} disabled={guardando}>
+                      {guardando ? 'Guardando...' : esNuevo ? 'Crear producto' : 'Guardar cambios'}
                     </button>
                   </div>
-                  {form.filamentoTipo === 'fijo' && (
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
-                      <input style={inputStyle} value={form.filMaterial} onChange={e => set('filMaterial', e.target.value)} placeholder="Material" />
-                      <input style={inputStyle} value={form.filColor} onChange={e => set('filColor', e.target.value)} placeholder="Color" />
-                      <input style={inputStyle} value={form.filMarca} onChange={e => set('filMarca', e.target.value)} placeholder="Marca" />
-                    </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Modal: gestionar categorías ─────────────────────────
+function CategoriasModal({ categorias, productos, onClose, onChanged }: {
+  categorias: Categoria[]; productos: Producto[]; onClose: () => void; onChanged: () => void
+}) {
+  const [nuevo, setNuevo] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [borrando, setBorrando] = useState<string | null>(null)
+
+  const conteos = useMemo(() => {
+    const c: Record<string, number> = {}
+    productos.forEach(p => { if (p.categoria) c[p.categoria] = (c[p.categoria] || 0) + 1 })
+    return c
+  }, [productos])
+
+  async function agregar() {
+    const nombre = nuevo.trim()
+    if (!nombre) return
+    setGuardando(true)
+    await supabase.from('producto_categorias').insert({ nombre })
+    setNuevo('')
+    setGuardando(false)
+    onChanged()
+  }
+
+  async function eliminar(cat: Categoria) {
+    await supabase.from('producto_categorias').delete().eq('id', cat.id)
+    setBorrando(null)
+    onChanged()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 20 }} onClick={onClose}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, width: 440, maxWidth: '92vw', maxHeight: '82vh', overflowY: 'auto', padding: 26 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Categorías de producto</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+          <input style={S.input} value={nuevo} onChange={e => setNuevo(e.target.value)} placeholder="Nueva categoría..." onKeyDown={e => { if (e.key === 'Enter') agregar() }} />
+          <button style={S.btn('primary')} onClick={agregar} disabled={guardando}>+ Agregar</button>
+        </div>
+        {categorias.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--color-muted)' }}>Todavía no creaste categorías.</p>
+        ) : (
+          categorias.map(c => (
+            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--color-border)' }}>
+              <div>
+                <span style={{ fontSize: 14, color: 'var(--color-text)' }}>{c.nombre}</span>
+                <span style={{ fontSize: 11, color: 'var(--color-muted)', marginLeft: 8 }}>
+                  {conteos[c.nombre] || 0} producto{(conteos[c.nombre] || 0) === 1 ? '' : 's'}
+                </span>
+              </div>
+              {borrando === c.id ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  {(conteos[c.nombre] || 0) > 0 ? (
+                    <span style={{ fontSize: 11, color: 'var(--color-accent-red)' }}>En uso, no se puede borrar</span>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>¿Eliminar?</span>
+                      <button style={{ ...S.btn('danger'), padding: '3px 8px', fontSize: 11 }} onClick={() => eliminar(c)}>Sí</button>
+                    </>
                   )}
+                  <button style={{ ...S.btn(), padding: '3px 8px', fontSize: 11 }} onClick={() => setBorrando(null)}>Cancelar</button>
                 </div>
+              ) : (
+                <button onClick={() => setBorrando(c.id)} style={{ background: 'none', border: 'none', color: 'var(--color-accent-red)', cursor: 'pointer', fontSize: 14 }}>✕</button>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
 
-                <div style={{ marginTop: 10, padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-                  Costo de impresión por pieza (bruto): <strong style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</strong>
-                  <br />
-                  <span style={{ fontSize: 11 }}>
-                    {desglose.gramosConDesperdicio.toFixed(0)}g · {desglose.tiempoHs.toFixed(1)}hs · filamento {$$(desglose.costoFilamento)} + luz {$$(desglose.costoElectricidad)} + amortización {$$(desglose.costoAmortizacion)}, dividido en {form.piezas} {form.piezas === 1 ? 'pieza' : 'piezas'}.
-                  </span>
-                  <br />
-                  <span style={{ fontSize: 11 }}>Usa los valores ($/kg, $/kWh, amortización) configurados en la <Link href="/calculadora" style={{ color: 'var(--color-brand)' }}>Calculadora</Link>.</span>
-                </div>
-              </div>
+// ── Modal: gestionar catálogo de componentes ────────────
+function ComponentesCatalogoModal({ catalogo, categorias, onClose, onChanged }: {
+  catalogo: ComponenteCatalogo[]; categorias: Categoria[]; onClose: () => void; onChanged: () => void
+}) {
+  const [nombre, setNombre] = useState('')
+  const [precio, setPrecio] = useState(0)
+  const [cats, setCats] = useState<string[]>([])
+  const [guardando, setGuardando] = useState(false)
+  const [editando, setEditando] = useState<ComponenteCatalogo | null>(null)
 
-              {/* Componentes */}
+  function abrirNuevo() { setEditando(null); setNombre(''); setPrecio(0); setCats([]) }
+  function abrirEditar(item: ComponenteCatalogo) { setEditando(item); setNombre(item.nombre); setPrecio(item.precio_unitario); setCats(item.categorias) }
+  function toggleCat(nombreCat: string) { setCats(prev => prev.includes(nombreCat) ? prev.filter(c => c !== nombreCat) : [...prev, nombreCat]) }
+
+  async function guardar() {
+    if (!nombre.trim()) return
+    setGuardando(true)
+    const payload = { nombre: nombre.trim(), precio_unitario: precio, categorias: cats }
+    if (editando) await supabase.from('producto_componentes_catalogo').update(payload).eq('id', editando.id)
+    else await supabase.from('producto_componentes_catalogo').insert(payload)
+    setGuardando(false)
+    abrirNuevo()
+    onChanged()
+  }
+
+  async function eliminar(id: string) {
+    await supabase.from('producto_componentes_catalogo').delete().eq('id', id)
+    if (editando?.id === id) abrirNuevo()
+    onChanged()
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 20 }} onClick={onClose}>
+      <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, width: 560, maxWidth: '94vw', maxHeight: '86vh', overflowY: 'auto', padding: 26 }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--color-text)', margin: 0 }}>Catálogo de componentes</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--color-muted)', fontSize: 18, cursor: 'pointer' }}>✕</button>
+        </div>
+
+        <div style={{ background: 'var(--color-surface-2)', borderRadius: 10, padding: 16, marginBottom: 20 }}>
+          <div style={S.sectionTitle}>{editando ? `Editando: ${editando.nombre}` : 'Nuevo componente'}</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 10, marginBottom: 10 }}>
+            <input style={S.input} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Portalámparas" />
+            <input type="number" style={S.input} value={precio} onChange={e => setPrecio(Number(e.target.value))} placeholder="Precio" />
+          </div>
+          <label style={S.label}>Aparece en categorías (vacío = todas)</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: 14 }}>
+            {categorias.map(c => (
+              <button key={c.id} onClick={() => toggleCat(c.nombre)} style={{
+                fontSize: 11, padding: '4px 10px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                border: cats.includes(c.nombre) ? '1px solid var(--color-brand)' : '1px solid var(--color-border)',
+                background: cats.includes(c.nombre) ? 'var(--color-brand-light)' : 'transparent',
+                color: cats.includes(c.nombre) ? 'var(--color-brand)' : 'var(--color-muted)',
+              }}>{c.nombre}</button>
+            ))}
+            {categorias.length === 0 && <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Todavía no hay categorías creadas.</span>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            {editando && <button style={S.btn()} onClick={abrirNuevo}>Cancelar</button>}
+            <button style={S.btn('primary')} onClick={guardar} disabled={guardando}>{editando ? 'Guardar cambios' : '+ Agregar al catálogo'}</button>
+          </div>
+        </div>
+
+        {catalogo.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'var(--color-muted)' }}>Todavía no hay componentes en el catálogo.</p>
+        ) : (
+          catalogo.map(item => (
+            <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--color-border)' }}>
               <div>
-                <div style={S.sectionTitle}>Componentes / packaging</div>
-                <ComponentesEditor componentes={form.componentes} onChange={c => set('componentes', c)} />
-              </div>
-
-              {/* Resumen de costos + precio */}
-              <div style={{ padding: '14px 16px', background: '#111110', borderRadius: 10 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', padding: '2px 0' }}>
-                  <span>Costo impresión</span><span>{$$(costoImpresionUnit)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#888', padding: '2px 0' }}>
-                  <span>Costo componentes</span><span>{$$(costoComponentes)}</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 14, fontWeight: 700, color: '#fff', padding: '6px 0 0', marginTop: 4, borderTop: '1px solid #2a2a28' }}>
-                  <span>Costo total (bruto, sin ganancia)</span><span>{$$(costoTotal)}</span>
-                </div>
-
-                <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'end' }}>
-                  <NumField label="Precio de venta final" value={form.precio} onChange={v => set('precio', v)} prefix="$" step={100} />
-                  <div style={{ textAlign: 'right' as const, paddingBottom: 6 }}>
-                    <div style={{ fontSize: 10, color: '#666' }}>Ganancia</div>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: ganancia >= 0 ? '#4ade80' : '#f87171' }}>
-                      {$$(ganancia)} {form.precio > 0 && <span style={{ color: '#666', fontWeight: 400 }}>({pctGanancia.toFixed(0)}%)</span>}
-                    </div>
-                  </div>
+                <div style={{ fontSize: 14, color: 'var(--color-text)' }}>{item.nombre}</div>
+                <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>
+                  {$$(item.precio_unitario)} · {item.categorias.length === 0 ? 'Todas las categorías' : item.categorias.join(', ')}
                 </div>
               </div>
-
-              <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-                <button style={S.btn()} onClick={() => { if (esNuevo) onClose(); else { resetForm(); setEditing(false) } }}>
-                  Cancelar
-                </button>
-                <button style={S.btn('primary')} onClick={handleGuardar} disabled={guardando}>
-                  {guardando ? 'Guardando...' : esNuevo ? 'Crear producto' : 'Guardar cambios'}
-                </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button style={{ ...S.btn(), padding: '4px 10px', fontSize: 12 }} onClick={() => abrirEditar(item)}>✎</button>
+                <button style={{ ...S.btn('danger'), padding: '4px 10px', fontSize: 12 }} onClick={() => eliminar(item.id)}>✕</button>
               </div>
             </div>
-          )}
-        </div>
+          ))
+        )}
       </div>
     </div>
   )
@@ -582,29 +860,46 @@ function ProductoModal({ producto, categoriasExistentes, onClose, onSaved, onDel
 // ── Página principal ─────────────────────────────────────
 export default function ProductosPage() {
   const [productos, setProductos] = useState<Producto[]>([])
+  const [categorias, setCategorias] = useState<Categoria[]>([])
+  const [catalogo, setCatalogo] = useState<ComponenteCatalogo[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [catFiltro, setCatFiltro] = useState('todos')
   const [modal, setModal] = useState<{ producto: Producto | null } | null>(null)
+  const [modalCategorias, setModalCategorias] = useState(false)
+  const [modalCatalogo, setModalCatalogo] = useState(false)
 
-  useEffect(() => { cargar() }, [])
+  useEffect(() => { cargarTodo() }, [])
 
-  async function cargar() {
-    setLoading(true)
+  async function cargarProductos() {
     const { data } = await supabase.from('productos').select('*').order('created_at', { ascending: false })
     setProductos((data || []).map((p: any) => ({
       ...p,
       componentes: p.componentes || [],
       insumos_usados: p.insumos_usados || [],
     })))
+  }
+
+  async function cargarCatalogos() {
+    const [{ data: cats }, { data: comps }] = await Promise.all([
+      supabase.from('producto_categorias').select('*').order('nombre'),
+      supabase.from('producto_componentes_catalogo').select('*').order('nombre'),
+    ])
+    setCategorias(cats || [])
+    setCatalogo((comps || []).map((c: any) => ({ ...c, categorias: c.categorias || [] })))
+  }
+
+  async function cargarTodo() {
+    setLoading(true)
+    await Promise.all([cargarProductos(), cargarCatalogos()])
     setLoading(false)
   }
 
   function cerrarModal() { setModal(null) }
-  async function alGuardar() { await cargar(); setModal(null) }
-  async function alEliminar() { await cargar(); setModal(null) }
+  async function alGuardar() { await cargarProductos(); setModal(null) }
+  async function alEliminar() { await cargarProductos(); setModal(null) }
 
-  const categorias = useMemo(() => {
+  const categoriasConProductos = useMemo(() => {
     const set = new Set<string>()
     productos.forEach(p => set.add(p.categoria?.trim() || SIN_CATEGORIA))
     return Array.from(set).sort((a, b) => a === SIN_CATEGORIA ? 1 : b === SIN_CATEGORIA ? -1 : a.localeCompare(b))
@@ -619,12 +914,11 @@ export default function ProductosPage() {
 
   const grupos = useMemo(() => {
     if (catFiltro !== 'todos') return [{ categoria: catFiltro, items: filtrados }]
-    const porCat = categorias.map(c => ({
+    return categoriasConProductos.map(c => ({
       categoria: c,
       items: filtrados.filter(p => (p.categoria?.trim() || SIN_CATEGORIA) === c),
     })).filter(g => g.items.length > 0)
-    return porCat
-  }, [filtrados, categorias, catFiltro])
+  }, [filtrados, categoriasConProductos, catFiltro])
 
   function Card({ p }: { p: Producto }) {
     const costoTotal = p.costo_total ?? 0
@@ -650,9 +944,17 @@ export default function ProductosPage() {
             <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
               ⏱ {p.tiempo_horas || 0}h {p.minutos_impresion || 0}m
             </span>
+            <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
+              📦 {p.stock ?? 0}
+            </span>
             {costoTotal > 0 && (
               <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
                 Costo {$$(costoTotal)}
+              </span>
+            )}
+            {!!p.precio_mercadolibre && (
+              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-accent-yellow-bg)', color: 'var(--color-accent-yellow)' }}>
+                ML {$$(p.precio_mercadolibre)}
               </span>
             )}
           </div>
@@ -674,7 +976,11 @@ export default function ProductosPage() {
           <h1 style={{ fontSize: 22, fontWeight: 600, color: 'var(--color-text)' }}>Productos</h1>
           <p style={{ fontSize: 13, color: 'var(--color-muted)', marginTop: 2 }}>Fichas de producto: receta, componentes y costo real</p>
         </div>
-        <button style={S.btn('primary')} onClick={() => setModal({ producto: null })}>+ Nuevo producto</button>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' as const }}>
+          <button style={S.btn()} onClick={() => setModalCategorias(true)}>🏷️ Categorías</button>
+          <button style={S.btn()} onClick={() => setModalCatalogo(true)}>🧩 Componentes</button>
+          <button style={S.btn('primary')} onClick={() => setModal({ producto: null })}>+ Nuevo producto</button>
+        </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap' as const, gap: 12 }}>
@@ -684,7 +990,7 @@ export default function ProductosPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        {categorias.length > 0 && (
+        {categoriasConProductos.length > 0 && (
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const }}>
             <button className="pg-chip" onClick={() => setCatFiltro('todos')} style={{
               background: catFiltro === 'todos' ? 'var(--color-brand)' : 'var(--color-surface-2)',
@@ -692,7 +998,7 @@ export default function ProductosPage() {
             }}>
               Todos ({productos.length})
             </button>
-            {categorias.map(c => {
+            {categoriasConProductos.map(c => {
               const n = productos.filter(p => (p.categoria?.trim() || SIN_CATEGORIA) === c).length
               return (
                 <button key={c} className="pg-chip" onClick={() => setCatFiltro(c)} style={{
@@ -736,10 +1042,28 @@ export default function ProductosPage() {
       {modal && (
         <ProductoModal
           producto={modal.producto}
-          categoriasExistentes={categorias.filter(c => c !== SIN_CATEGORIA)}
+          categorias={categorias}
+          catalogo={catalogo}
           onClose={cerrarModal}
           onSaved={alGuardar}
           onDeleted={alEliminar}
+          onCatalogosChanged={cargarCatalogos}
+        />
+      )}
+      {modalCategorias && (
+        <CategoriasModal
+          categorias={categorias}
+          productos={productos}
+          onClose={() => setModalCategorias(false)}
+          onChanged={cargarCatalogos}
+        />
+      )}
+      {modalCatalogo && (
+        <ComponentesCatalogoModal
+          catalogo={catalogo}
+          categorias={categorias}
+          onClose={() => setModalCatalogo(false)}
+          onChanged={cargarCatalogos}
         />
       )}
     </div>
