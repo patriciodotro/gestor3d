@@ -527,6 +527,9 @@ type DatosCalculados = {
 function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => void; datosCalculados: DatosCalculados }) {
   const [nombre, setNombre] = useState('')
   const [categoria, setCategoria] = useState('')
+  const [categoriasProducto, setCategoriasProducto] = useState<{ id: string; nombre: string }[]>([])
+  const [agregandoCategoria, setAgregandoCategoria] = useState(false)
+  const [nuevaCategoriaTexto, setNuevaCategoriaTexto] = useState('')
   const [notas, setNotas] = useState('')
   const [filamentoTipo, setFilamentoTipo] = useState<'fijo' | 'variable'>('variable')
   const [filMaterial, setFilMaterial] = useState('PLA')
@@ -542,6 +545,25 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
 
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    supabase.from('producto_categorias').select('id, nombre').order('nombre').then(({ data }) => {
+      if (data) setCategoriasProducto(data)
+    })
+  }, [])
+
+  async function confirmarNuevaCategoria() {
+    const nombreNuevo = nuevaCategoriaTexto.trim()
+    if (!nombreNuevo) { setAgregandoCategoria(false); return }
+    const { error: catErr } = await supabase.from('producto_categorias').insert({ nombre: nombreNuevo })
+    if (!catErr) {
+      const { data } = await supabase.from('producto_categorias').select('id, nombre').order('nombre')
+      if (data) setCategoriasProducto(data)
+    }
+    setCategoria(nombreNuevo)
+    setAgregandoCategoria(false)
+    setNuevaCategoriaTexto('')
+  }
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -660,7 +682,24 @@ function GuardarProductoModal({ onClose, datosCalculados: d }: { onClose: () => 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
             <div>
               <label style={labelStyle}>Categoría</label>
-              <input style={inputStyle} value={categoria} onChange={e => setCategoria(e.target.value)} placeholder="Ej: Wuly, Lenga..." />
+              {agregandoCategoria ? (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input style={inputStyle} autoFocus value={nuevaCategoriaTexto}
+                    onChange={e => setNuevaCategoriaTexto(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') confirmarNuevaCategoria() }}
+                    placeholder="Nombre de categoría" />
+                  <button onClick={confirmarNuevaCategoria} style={{ padding: '0 14px', borderRadius: 8, border: 'none', background: 'var(--color-brand)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>OK</button>
+                </div>
+              ) : (
+                <select style={inputStyle} value={categoria} onChange={e => {
+                  if (e.target.value === '__nueva__') setAgregandoCategoria(true)
+                  else setCategoria(e.target.value)
+                }}>
+                  <option value="">Sin categoría</option>
+                  {categoriasProducto.map(c => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                  <option value="__nueva__">+ Crear nueva categoría...</option>
+                </select>
+              )}
             </div>
             <div>
               <label style={labelStyle}>Stock inicial</label>
