@@ -10,7 +10,25 @@ const $$ = (n: number) =>
 // ── Tipos ────────────────────────────────────────────────
 type Componente = { id: string; nombre: string; cantidad: number; precio_unitario: number }
 type Categoria = { id: string; nombre: string; orden: number }
-type ComponenteCatalogo = { id: string; nombre: string; precio_unitario: number; categorias: string[] }
+type ComponenteCatalogo = { id: string; nombre: string; precio_unitario: number; categorias: string[]; es_packaging: boolean }
+
+// Una "parte" es cada pieza que se imprime por separado dentro de un mismo
+// producto (ej: una lámpara puede tener pantalla + base + guía de cable),
+// cada una con su propia receta de impresión y su propio material.
+type ParteImpresion = {
+  id: string
+  nombre: string
+  gramos: number
+  horas: number
+  minutos: number
+  piezas: number
+  filamentoTipo: 'fijo' | 'variable'
+  filMaterial: string
+  filColor: string
+  filMarca: string
+  precioKg: number
+  desperdicioPct: number
+}
 
 type Producto = {
   id: string
@@ -29,6 +47,7 @@ type Producto = {
   filamento_material: string | null
   filamento_color: string | null
   filamento_marca: string | null
+  partes: ParteImpresion[] | null
   componentes: Componente[] | null
   costo_impresion: number | null
   costo_componentes: number | null
@@ -38,6 +57,26 @@ type Producto = {
   desperdicio_pct: number | null
   insumos_usados: { insumo_id: string; nombre: string; costo_por_pieza: number }[] | null
   created_at: string
+}
+
+// Costo bruto de imprimir una parte: filamento + luz + amortización de ESA
+// parte (puede tener su propio $/kg y % de desperdicio), prorrateado por la
+// cantidad de piezas de esa parte que entran en una misma tirada.
+function calcularParte(parte: ParteImpresion, configGlobal: CalcConfig) {
+  const desglose = costoImpresion(parte.gramos, parte.horas, parte.minutos, {
+    ...configGlobal, precio_kg: parte.precioKg, desperdicio_pct: parte.desperdicioPct,
+  })
+  const unit = parte.piezas > 0 ? desglose.total / parte.piezas : desglose.total
+  return { desglose, unit }
+}
+
+function nuevaParte(configGlobal: CalcConfig, base?: Partial<ParteImpresion>): ParteImpresion {
+  return {
+    id: genId(), nombre: '', gramos: 100, horas: 2, minutos: 0, piezas: 1,
+    filamentoTipo: 'variable', filMaterial: 'PLA', filColor: '', filMarca: '',
+    precioKg: configGlobal.precio_kg, desperdicioPct: configGlobal.desperdicio_pct,
+    ...base,
+  }
 }
 
 const SIN_CATEGORIA = 'Sin categoría'
@@ -116,6 +155,7 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
   const [buscando, setBuscando] = useState(false)
   const [creandoNombre, setCreandoNombre] = useState<string | null>(null)
   const [precioNuevo, setPrecioNuevo] = useState(0)
+  const [packagingNuevo, setPackagingNuevo] = useState(false)
 
   function update(id: string, patch: Partial<Componente>) { onChange(componentes.map(c => c.id === id ? { ...c, ...patch } : c)) }
   function remove(id: string) { onChange(componentes.filter(c => c.id !== id)) }
@@ -128,35 +168,40 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
   function iniciarCreacion() {
     setCreandoNombre(busqueda.trim())
     setPrecioNuevo(0)
+    setPackagingNuevo(false)
   }
 
   function cancelarCreacion() {
     setCreandoNombre(null)
     setPrecioNuevo(0)
+    setPackagingNuevo(false)
   }
 
   async function confirmarCreacion() {
     if (!creandoNombre) return
     await supabase.from('producto_componentes_catalogo').insert({
-      nombre: creandoNombre, precio_unitario: precioNuevo, categorias: categoriaActual ? [categoriaActual] : [],
+      nombre: creandoNombre, precio_unitario: precioNuevo, es_packaging: packagingNuevo,
+      categorias: (!packagingNuevo && categoriaActual) ? [categoriaActual] : [],
     })
     onCatalogoChanged()
     agregarFila(creandoNombre, precioNuevo)
     setCreandoNombre(null)
     setPrecioNuevo(0)
+    setPackagingNuevo(false)
   }
 
   async function guardarEnCatalogo(c: Componente) {
     if (!c.nombre.trim()) return
     await supabase.from('producto_componentes_catalogo').insert({
-      nombre: c.nombre.trim(), precio_unitario: c.precio_unitario, categorias: categoriaActual ? [categoriaActual] : [],
+      nombre: c.nombre.trim(), precio_unitario: c.precio_unitario, es_packaging: false,
+      categorias: categoriaActual ? [categoriaActual] : [],
     })
     onCatalogoChanged()
   }
 
   const sugeridos = catalogo.filter(item => {
     const matchTexto = !busqueda || item.nombre.toLowerCase().includes(busqueda.toLowerCase())
-    const matchCategoria = item.categorias.length === 0 || (!!categoriaActual && item.categorias.includes(categoriaActual))
+    const matchCategoria = item.es_packaging || item.categorias.length === 0 || (!!categoriaActual && item.categorias.includes(categoriaActual))
     return matchTexto && matchCategoria
   }).slice(0, 8)
   const yaExiste = catalogo.some(item => item.nombre.trim().toLowerCase() === busqueda.trim().toLowerCase())
@@ -183,7 +228,7 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
                   Nuevo componente: <strong>{creandoNombre}</strong>
                 </div>
                 <label style={{ ...S.label, marginBottom: 4 }}>Precio (se guarda en el catálogo)</label>
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--color-border)', borderRadius: 8, background: 'var(--color-input-bg)', overflow: 'hidden', flex: 1 }}>
                     <span style={{ padding: '0 10px', color: 'var(--color-muted)', fontSize: 12, borderRight: '1px solid var(--color-border)', background: 'var(--color-surface-2)' }}>$</span>
                     <input type="number" autoFocus min={0} value={precioNuevo}
@@ -196,12 +241,16 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
                   </button>
                   <button onClick={cancelarCreacion} style={{ padding: '7px 10px', borderRadius: 6, border: '1px solid var(--color-border)', background: 'transparent', color: 'var(--color-muted)', fontSize: 12, cursor: 'pointer', fontFamily: 'inherit' }}>✕</button>
                 </div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={packagingNuevo} onChange={e => setPackagingNuevo(e.target.checked)} />
+                  Es packaging (caja, cinta, etc.) — aparece siempre, en cualquier categoría
+                </label>
               </div>
             ) : (
               <>
                 {sugeridos.map(item => (
                   <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const }}>
-                    <span>{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
+                    <span>{item.es_packaging && '📦 '}{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
                   </button>
                 ))}
                 {busqueda.trim() && !yaExiste && (
@@ -273,16 +322,7 @@ type FormState = {
   stock: number
   precio: number
   precioML: number
-  gramos: number
-  horas: number
-  minutos: number
-  piezas: number
-  filamentoTipo: 'fijo' | 'variable'
-  filMaterial: string
-  filColor: string
-  filMarca: string
-  precioKg: number
-  desperdicioPct: number
+  partes: ParteImpresion[]
   componentes: Componente[]
   foto_url: string | null
 }
@@ -292,26 +332,118 @@ function formFromProducto(p: Producto | null): FormState {
   if (!p) {
     return {
       nombre: '', categoria: '', notas: '', stock: 0, precio: 0, precioML: 0,
-      gramos: 100, horas: 2, minutos: 0, piezas: 1,
-      filamentoTipo: 'variable', filMaterial: 'PLA', filColor: '', filMarca: '',
-      precioKg: config.precio_kg, desperdicioPct: config.desperdicio_pct,
+      partes: [nuevaParte(config)],
       componentes: [], foto_url: null,
     }
   }
   const componentes = (p.componentes && p.componentes.length > 0)
     ? p.componentes
     : (p.insumos_usados || []).map(i => ({ id: genId(), nombre: i.nombre, cantidad: 1, precio_unitario: i.costo_por_pieza }))
+  // Productos guardados antes de que existieran las "partes" no tienen esta
+  // columna cargada — se arma una única parte a partir de los campos viejos
+  // (gramos/horas/minutos/piezas/filamento/precio_kg sueltos de la ficha).
+  const partes = (p.partes && p.partes.length > 0)
+    ? p.partes
+    : [nuevaParte(config, {
+        gramos: p.gramos || 0, horas: p.tiempo_horas || 0, minutos: p.minutos_impresion || 0, piezas: p.cantidad_piezas || 1,
+        filamentoTipo: p.filamento_tipo || 'variable',
+        filMaterial: p.filamento_material || 'PLA', filColor: p.filamento_color || '', filMarca: p.filamento_marca || '',
+        precioKg: p.precio_kg != null && p.precio_kg > 0 ? p.precio_kg : config.precio_kg,
+        desperdicioPct: p.desperdicio_pct != null ? p.desperdicio_pct : config.desperdicio_pct,
+      })]
   return {
     nombre: p.nombre, categoria: p.categoria || '', notas: p.notas || '',
     stock: p.stock || 0, precio: p.precio || 0, precioML: p.precio_mercadolibre || 0,
-    gramos: p.gramos || 0, horas: p.tiempo_horas || 0, minutos: p.minutos_impresion || 0, piezas: p.cantidad_piezas || 1,
-    filamentoTipo: p.filamento_tipo || 'variable',
-    filMaterial: p.filamento_material || 'PLA', filColor: p.filamento_color || '', filMarca: p.filamento_marca || '',
-    precioKg: p.precio_kg != null && p.precio_kg > 0 ? p.precio_kg : config.precio_kg,
-    desperdicioPct: p.desperdicio_pct != null ? p.desperdicio_pct : config.desperdicio_pct,
+    partes,
     componentes,
     foto_url: p.foto_url,
   }
+}
+
+// ── Editor de las partes de impresión de un producto ────
+function PartesImpresionSection({ partes, onChange, configGlobal }: {
+  partes: ParteImpresion[]
+  onChange: (p: ParteImpresion[]) => void
+  configGlobal: CalcConfig
+}) {
+  function update(id: string, patch: Partial<ParteImpresion>) { onChange(partes.map(p => p.id === id ? { ...p, ...patch } : p)) }
+  function remove(id: string) { if (partes.length > 1) onChange(partes.filter(p => p.id !== id)) }
+  function agregar() { onChange([...partes, nuevaParte(configGlobal, { precioKg: partes[0]?.precioKg, desperdicioPct: partes[0]?.desperdicioPct })]) }
+
+  return (
+    <div>
+      {partes.map((parte, i) => {
+        const { desglose, unit } = calcularParte(parte, configGlobal)
+        return (
+          <div key={parte.id} style={{ border: '1px solid var(--color-border)', borderRadius: 10, padding: 14, marginBottom: 12, background: 'var(--color-surface)' }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10 }}>
+              <input style={{ ...S.input, flex: 1, fontWeight: 600 }} value={parte.nombre}
+                onChange={e => update(parte.id, { nombre: e.target.value })}
+                placeholder={partes.length > 1 ? `Parte ${i + 1} (ej: Pantalla, Base, Guía de cable...)` : 'Nombre de la parte (opcional si es una sola pieza)'} />
+              {partes.length > 1 && (
+                <button title="Quitar esta parte" onClick={() => remove(parte.id)} style={{ background: 'none', border: 'none', color: 'var(--color-accent-red)', cursor: 'pointer', fontSize: 16 }}>✕</button>
+              )}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <NumField label="Gramos" value={parte.gramos} onChange={v => update(parte.id, { gramos: v })} suffix="g" />
+              <NumField label="Horas" value={parte.horas} onChange={v => update(parte.id, { horas: v })} suffix="hs" />
+              <NumField label="Minutos" value={parte.minutos} onChange={v => update(parte.id, { minutos: v })} suffix="min" />
+              <NumField label="Piezas en la tirada" value={parte.piezas} onChange={v => update(parte.id, { piezas: v })} min={1} />
+            </div>
+
+            <label style={S.label}>Filamento / color</label>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+              <button onClick={() => update(parte.id, { filamentoTipo: 'variable' })} style={{
+                flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
+                background: parte.filamentoTipo === 'variable' ? 'var(--color-accent-purple)' : 'transparent',
+                color: parte.filamentoTipo === 'variable' ? '#1a1a18' : 'var(--color-text)',
+              }}>
+                A elección del cliente
+              </button>
+              <button onClick={() => update(parte.id, { filamentoTipo: 'fijo' })} style={{
+                flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
+                background: parte.filamentoTipo === 'fijo' ? 'var(--color-accent-blue)' : 'transparent',
+                color: parte.filamentoTipo === 'fijo' ? '#1a1a18' : 'var(--color-text)',
+              }}>
+                Color fijo
+              </button>
+            </div>
+            {parte.filamentoTipo === 'fijo' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
+                <input style={S.input} value={parte.filMaterial} onChange={e => update(parte.id, { filMaterial: e.target.value })} placeholder="Material" />
+                <input style={S.input} value={parte.filColor} onChange={e => update(parte.id, { filColor: e.target.value })} placeholder="Color" />
+                <input style={S.input} value={parte.filMarca} onChange={e => update(parte.id, { filMarca: e.target.value })} placeholder="Marca" />
+              </div>
+            )}
+
+            <label style={S.label}>Costo del material de esta parte</label>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+              <NumField label="Precio del filamento" value={parte.precioKg} onChange={v => update(parte.id, { precioKg: v })} prefix="$" suffix="/kg" step={100} />
+              <NumField label="Desperdicio / fallas" value={parte.desperdicioPct} onChange={v => update(parte.id, { desperdicioPct: v })} suffix="%" />
+            </div>
+
+            <div style={{ padding: '8px 12px', background: 'var(--color-surface-2)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
+              Costo de esta parte (bruto): <strong style={{ color: 'var(--color-text)' }}>{$$(unit)}</strong>
+              <br />
+              <span style={{ fontSize: 11 }}>
+                {desglose.gramosConDesperdicio.toFixed(0)}g · {desglose.tiempoHs.toFixed(1)}hs · filamento {$$(desglose.costoFilamento)} + luz {$$(desglose.costoElectricidad)} + amortización {$$(desglose.costoAmortizacion)}, dividido en {parte.piezas} {parte.piezas === 1 ? 'pieza' : 'piezas'}.
+              </span>
+            </div>
+          </div>
+        )
+      })}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button onClick={agregar} style={{ fontSize: 11, padding: '4px 10px', borderRadius: 12, border: '1px solid var(--color-border)', background: 'var(--color-surface-2)', color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600 }}>
+          + Agregar parte
+        </button>
+        <span style={{ fontSize: 11 }}>
+          Luz y amortización usan siempre los valores generales de la <Link href="/calculadora" style={{ color: 'var(--color-brand)' }}>Calculadora</Link>.
+        </span>
+      </div>
+    </div>
+  )
 }
 
 // ── Modal: ver / editar / crear producto ────────────────
@@ -343,11 +475,10 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
 
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) => setForm(f => ({ ...f, [key]: val }))
 
-  const desglose = useMemo(
-    () => costoImpresion(form.gramos, form.horas, form.minutos, { ...config, precio_kg: form.precioKg, desperdicio_pct: form.desperdicioPct }),
-    [form.gramos, form.horas, form.minutos, form.precioKg, form.desperdicioPct, config]
+  const costoImpresionUnit = useMemo(
+    () => form.partes.reduce((s, parte) => s + calcularParte(parte, config).unit, 0),
+    [form.partes, config]
   )
-  const costoImpresionUnit = form.piezas > 0 ? desglose.total / form.piezas : desglose.total
   const costoComponentes = form.componentes.reduce((s, c) => s + c.cantidad * c.precio_unitario, 0)
   const costoTotal = costoImpresionUnit + costoComponentes
 
@@ -396,6 +527,14 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
         foto_url = fotoUrlManual.trim()
       }
 
+      // Las columnas sueltas (gramos, tiempo_horas, filamento, precio_kg...)
+      // se mantienen como resumen agregado de todas las partes, para no
+      // romper otras vistas (tarjeta de producto, etc.) — el detalle real,
+      // parte por parte, vive en `partes`.
+      const primeraParte = form.partes[0]
+      const gramosTotal = form.partes.reduce((s, p) => s + p.gramos, 0)
+      const minutosTotal = form.partes.reduce((s, p) => s + p.horas * 60 + p.minutos, 0)
+
       const payload = {
         nombre: form.nombre.trim(),
         categoria: form.categoria.trim() || null,
@@ -404,20 +543,21 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
         stock: form.stock,
         notas: form.notas.trim() || null,
         foto_url,
-        gramos: form.gramos,
-        tiempo_horas: form.horas,
-        minutos_impresion: form.minutos,
-        cantidad_piezas: form.piezas,
-        filamento_tipo: form.filamentoTipo,
-        filamento_material: form.filamentoTipo === 'fijo' ? form.filMaterial : null,
-        filamento_color: form.filamentoTipo === 'fijo' ? form.filColor : null,
-        filamento_marca: form.filamentoTipo === 'fijo' ? form.filMarca : null,
-        precio_kg: form.precioKg,
-        desperdicio_pct: form.desperdicioPct,
+        gramos: gramosTotal,
+        tiempo_horas: Math.floor(minutosTotal / 60),
+        minutos_impresion: minutosTotal % 60,
+        cantidad_piezas: primeraParte?.piezas || 1,
+        filamento_tipo: primeraParte?.filamentoTipo || 'variable',
+        filamento_material: primeraParte?.filamentoTipo === 'fijo' ? primeraParte.filMaterial : null,
+        filamento_color: primeraParte?.filamentoTipo === 'fijo' ? primeraParte.filColor : null,
+        filamento_marca: primeraParte?.filamentoTipo === 'fijo' ? primeraParte.filMarca : null,
+        precio_kg: primeraParte?.precioKg ?? config.precio_kg,
+        desperdicio_pct: primeraParte?.desperdicioPct ?? config.desperdicio_pct,
         precio_kwh: config.precio_kwh,
         consumo_w: config.consumo_w,
         costo_impresora: config.costo_impresora,
         vida_util_hs: config.vida_util_hs,
+        partes: form.partes,
         componentes: form.componentes,
         costo_impresion: costoImpresionUnit,
         costo_componentes: costoComponentes,
@@ -566,22 +706,31 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
               {!editing ? (
                 <>
                   <div style={S.sectionCard}>
-                    <div style={S.sectionTitle}>Receta de impresión</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, fontSize: 13 }}>
-                      <div><span style={{ color: 'var(--color-muted)' }}>Gramos:</span> <strong style={{ color: 'var(--color-text)' }}>{form.gramos}g</strong></div>
-                      <div><span style={{ color: 'var(--color-muted)' }}>Tiempo:</span> <strong style={{ color: 'var(--color-text)' }}>{form.horas}h {form.minutos}m</strong></div>
-                      <div><span style={{ color: 'var(--color-muted)' }}>Piezas por tirada:</span> <strong style={{ color: 'var(--color-text)' }}>{form.piezas}</strong></div>
-                      <div>
-                        <span style={{ color: 'var(--color-muted)' }}>Filamento:</span>{' '}
-                        {form.filamentoTipo === 'fijo' ? (
-                          <strong style={{ color: 'var(--color-text)' }}>{form.filMaterial} {form.filColor}</strong>
-                        ) : (
-                          <strong style={{ color: 'var(--color-accent-purple)' }}>A elección</strong>
-                        )}
-                      </div>
-                      <div><span style={{ color: 'var(--color-muted)' }}>Precio filamento:</span> <strong style={{ color: 'var(--color-text)' }}>{$$(form.precioKg)}/kg</strong></div>
-                      <div><span style={{ color: 'var(--color-muted)' }}>Desperdicio:</span> <strong style={{ color: 'var(--color-text)' }}>{form.desperdicioPct}%</strong></div>
+                    <div style={S.sectionTitle}>
+                      Receta de impresión{form.partes.length > 1 && ` · consta de ${form.partes.length} partes`}
                     </div>
+                    {form.partes.map((parte, i) => {
+                      const { unit } = calcularParte(parte, config)
+                      return (
+                        <div key={parte.id} style={{ padding: '8px 0', borderBottom: i < form.partes.length - 1 ? '1px solid var(--color-border)' : 'none' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}>
+                            <strong style={{ color: 'var(--color-text)' }}>{parte.nombre || (form.partes.length > 1 ? `Parte ${i + 1}` : form.nombre || 'Pieza única')}</strong>
+                            <span style={{ color: 'var(--color-muted)' }}>{$$(unit)}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 2 }}>
+                            {parte.gramos}g · {parte.horas}h {parte.minutos}m · {parte.piezas} {parte.piezas === 1 ? 'pieza/tirada' : 'piezas/tirada'} ·{' '}
+                            {parte.filamentoTipo === 'fijo' ? `${parte.filMaterial} ${parte.filColor}` : 'filamento a elección'} · {$$(parte.precioKg)}/kg
+                            {parte.desperdicioPct ? ` · ${parte.desperdicioPct}% desperdicio` : ''}
+                          </div>
+                        </div>
+                      )
+                    })}
+                    {form.partes.length > 1 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, fontWeight: 700, padding: '8px 0 0', marginTop: 4, borderTop: '1px solid var(--color-border)' }}>
+                        <span style={{ color: 'var(--color-text)' }}>Total impresión</span>
+                        <span style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div style={S.sectionCard}>
@@ -652,54 +801,13 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
               ) : (
                 <>
                   <div style={S.sectionCard}>
-                    <div style={S.sectionTitle}>Receta de impresión</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 12 }}>
-                      <NumField label="Gramos (tirada)" value={form.gramos} onChange={v => set('gramos', v)} suffix="g" />
-                      <NumField label="Horas" value={form.horas} onChange={v => set('horas', v)} suffix="hs" />
-                      <NumField label="Minutos" value={form.minutos} onChange={v => set('minutos', v)} suffix="min" />
-                      <NumField label="Piezas en la tirada" value={form.piezas} onChange={v => set('piezas', v)} min={1} />
+                    <div style={S.sectionTitle}>
+                      Receta de impresión{form.partes.length > 1 && ` · ${form.partes.length} partes`}
                     </div>
-
-                    <label style={S.label}>Filamento / color</label>
-                    <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
-                      <button onClick={() => set('filamentoTipo', 'variable')} style={{
-                        flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
-                        background: form.filamentoTipo === 'variable' ? 'var(--color-accent-purple)' : 'transparent',
-                        color: form.filamentoTipo === 'variable' ? '#1a1a18' : 'var(--color-text)',
-                      }}>
-                        A elección del cliente
-                      </button>
-                      <button onClick={() => set('filamentoTipo', 'fijo')} style={{
-                        flex: 1, padding: '7px 0', borderRadius: 6, fontSize: 12, fontWeight: 500, border: '1px solid var(--color-border)', cursor: 'pointer', fontFamily: 'inherit',
-                        background: form.filamentoTipo === 'fijo' ? 'var(--color-accent-blue)' : 'transparent',
-                        color: form.filamentoTipo === 'fijo' ? '#1a1a18' : 'var(--color-text)',
-                      }}>
-                        Color fijo
-                      </button>
-                    </div>
-                    {form.filamentoTipo === 'fijo' && (
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 10 }}>
-                        <input style={S.input} value={form.filMaterial} onChange={e => set('filMaterial', e.target.value)} placeholder="Material" />
-                        <input style={S.input} value={form.filColor} onChange={e => set('filColor', e.target.value)} placeholder="Color" />
-                        <input style={S.input} value={form.filMarca} onChange={e => set('filMarca', e.target.value)} placeholder="Marca" />
-                      </div>
-                    )}
-
-                    <label style={S.label}>Costo del material</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
-                      <NumField label="Precio del filamento" value={form.precioKg} onChange={v => set('precioKg', v)} prefix="$" suffix="/kg" step={100} />
-                      <NumField label="Desperdicio / fallas" value={form.desperdicioPct} onChange={v => set('desperdicioPct', v)} suffix="%" />
-                    </div>
-
-                    <div style={{ padding: '8px 12px', background: 'var(--color-surface)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
-                      Costo de impresión por pieza (bruto): <strong style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</strong>
-                      <br />
-                      <span style={{ fontSize: 11 }}>
-                        {desglose.gramosConDesperdicio.toFixed(0)}g · {desglose.tiempoHs.toFixed(1)}hs · filamento {$$(desglose.costoFilamento)} + luz {$$(desglose.costoElectricidad)} + amortización {$$(desglose.costoAmortizacion)}, dividido en {form.piezas} {form.piezas === 1 ? 'pieza' : 'piezas'}.
-                      </span>
-                      <br />
-                      <span style={{ fontSize: 11 }}>El $/kg y el % de desperdicio son propios de este producto (se precargan desde la <Link href="/calculadora" style={{ color: 'var(--color-brand)' }}>Calculadora</Link> al crearlo). Luz y amortización sí usan siempre los valores generales de la Calculadora.</span>
-                    </div>
+                    <p style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: -4, marginBottom: 12 }}>
+                      Si el producto se imprime en más de una pieza (ej: pantalla, base y guía de cable), agregá una parte por cada una — cada parte puede usar un material distinto.
+                    </p>
+                    <PartesImpresionSection partes={form.partes} onChange={p => set('partes', p)} configGlobal={config} />
                   </div>
 
                   <div style={S.sectionCard}>
@@ -834,17 +942,18 @@ function ComponentesCatalogoModal({ catalogo, categorias, onClose, onChanged }: 
   const [nombre, setNombre] = useState('')
   const [precio, setPrecio] = useState(0)
   const [cats, setCats] = useState<string[]>([])
+  const [esPackaging, setEsPackaging] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [editando, setEditando] = useState<ComponenteCatalogo | null>(null)
 
-  function abrirNuevo() { setEditando(null); setNombre(''); setPrecio(0); setCats([]) }
-  function abrirEditar(item: ComponenteCatalogo) { setEditando(item); setNombre(item.nombre); setPrecio(item.precio_unitario); setCats(item.categorias) }
+  function abrirNuevo() { setEditando(null); setNombre(''); setPrecio(0); setCats([]); setEsPackaging(false) }
+  function abrirEditar(item: ComponenteCatalogo) { setEditando(item); setNombre(item.nombre); setPrecio(item.precio_unitario); setCats(item.categorias); setEsPackaging(!!item.es_packaging) }
   function toggleCat(nombreCat: string) { setCats(prev => prev.includes(nombreCat) ? prev.filter(c => c !== nombreCat) : [...prev, nombreCat]) }
 
   async function guardar() {
     if (!nombre.trim()) return
     setGuardando(true)
-    const payload = { nombre: nombre.trim(), precio_unitario: precio, categorias: cats }
+    const payload = { nombre: nombre.trim(), precio_unitario: precio, categorias: cats, es_packaging: esPackaging }
     if (editando) await supabase.from('producto_componentes_catalogo').update(payload).eq('id', editando.id)
     else await supabase.from('producto_componentes_catalogo').insert(payload)
     setGuardando(false)
@@ -872,18 +981,26 @@ function ComponentesCatalogoModal({ catalogo, categorias, onClose, onChanged }: 
             <input style={S.input} value={nombre} onChange={e => setNombre(e.target.value)} placeholder="Ej: Portalámparas" />
             <input type="number" style={S.input} value={precio} onChange={e => setPrecio(Number(e.target.value))} placeholder="Precio" />
           </div>
-          <label style={S.label}>Aparece en categorías (vacío = todas)</label>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: 14 }}>
-            {categorias.map(c => (
-              <button key={c.id} onClick={() => toggleCat(c.nombre)} style={{
-                fontSize: 11, padding: '4px 10px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
-                border: cats.includes(c.nombre) ? '1px solid var(--color-brand)' : '1px solid var(--color-border)',
-                background: cats.includes(c.nombre) ? 'var(--color-brand-light)' : 'transparent',
-                color: cats.includes(c.nombre) ? 'var(--color-brand)' : 'var(--color-muted)',
-              }}>{c.nombre}</button>
-            ))}
-            {categorias.length === 0 && <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Todavía no hay categorías creadas.</span>}
-          </div>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-text)', cursor: 'pointer', marginBottom: 12 }}>
+            <input type="checkbox" checked={esPackaging} onChange={e => setEsPackaging(e.target.checked)} />
+            📦 Es packaging (caja, cinta, film, etc.) — aparece siempre, en cualquier categoría
+          </label>
+          {!esPackaging && (
+            <>
+              <label style={S.label}>Aparece en categorías (vacío = todas)</label>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' as const, marginBottom: 14 }}>
+                {categorias.map(c => (
+                  <button key={c.id} onClick={() => toggleCat(c.nombre)} style={{
+                    fontSize: 11, padding: '4px 10px', borderRadius: 12, cursor: 'pointer', fontFamily: 'inherit',
+                    border: cats.includes(c.nombre) ? '1px solid var(--color-brand)' : '1px solid var(--color-border)',
+                    background: cats.includes(c.nombre) ? 'var(--color-brand-light)' : 'transparent',
+                    color: cats.includes(c.nombre) ? 'var(--color-brand)' : 'var(--color-muted)',
+                  }}>{c.nombre}</button>
+                ))}
+                {categorias.length === 0 && <span style={{ fontSize: 11, color: 'var(--color-muted)' }}>Todavía no hay categorías creadas.</span>}
+              </div>
+            </>
+          )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             {editando && <button style={S.btn()} onClick={abrirNuevo}>Cancelar</button>}
             <button style={S.btn('primary')} onClick={guardar} disabled={guardando}>{editando ? 'Guardar cambios' : '+ Agregar al catálogo'}</button>
@@ -896,9 +1013,9 @@ function ComponentesCatalogoModal({ catalogo, categorias, onClose, onChanged }: 
           catalogo.map(item => (
             <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '9px 0', borderBottom: '1px solid var(--color-border)' }}>
               <div>
-                <div style={{ fontSize: 14, color: 'var(--color-text)' }}>{item.nombre}</div>
+                <div style={{ fontSize: 14, color: 'var(--color-text)' }}>{item.es_packaging && '📦 '}{item.nombre}</div>
                 <div style={{ fontSize: 11, color: 'var(--color-muted)' }}>
-                  {$$(item.precio_unitario)} · {item.categorias.length === 0 ? 'Todas las categorías' : item.categorias.join(', ')}
+                  {$$(item.precio_unitario)} · {item.es_packaging ? 'Packaging (todas las categorías)' : (item.categorias.length === 0 ? 'Todas las categorías' : item.categorias.join(', '))}
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -931,6 +1048,7 @@ export default function ProductosPage() {
     const { data } = await supabase.from('productos').select('*').order('created_at', { ascending: false })
     setProductos((data || []).map((p: any) => ({
       ...p,
+      partes: p.partes || [],
       componentes: p.componentes || [],
       insumos_usados: p.insumos_usados || [],
     })))
@@ -942,7 +1060,7 @@ export default function ProductosPage() {
       supabase.from('producto_componentes_catalogo').select('*').order('nombre'),
     ])
     setCategorias(cats || [])
-    setCatalogo((comps || []).map((c: any) => ({ ...c, categorias: c.categorias || [] })))
+    setCatalogo((comps || []).map((c: any) => ({ ...c, categorias: c.categorias || [], es_packaging: !!c.es_packaging })))
   }
 
   async function cargarTodo() {
@@ -1003,6 +1121,11 @@ export default function ProductosPage() {
             <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
               📦 {p.stock ?? 0}
             </span>
+            {!!p.partes && p.partes.length > 1 && (
+              <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
+                🧩 {p.partes.length} partes
+              </span>
+            )}
             {costoTotal > 0 && (
               <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 5, background: 'var(--color-surface-2)', color: 'var(--color-muted)' }}>
                 Costo {$$(costoTotal)}
