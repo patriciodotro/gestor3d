@@ -34,6 +34,8 @@ type Producto = {
   costo_componentes: number | null
   costo_total: number | null
   precio_venta_sugerido: number | null
+  precio_kg: number | null
+  desperdicio_pct: number | null
   insumos_usados: { insumo_id: string; nombre: string; costo_por_pieza: number }[] | null
   created_at: string
 }
@@ -279,16 +281,20 @@ type FormState = {
   filMaterial: string
   filColor: string
   filMarca: string
+  precioKg: number
+  desperdicioPct: number
   componentes: Componente[]
   foto_url: string | null
 }
 
 function formFromProducto(p: Producto | null): FormState {
+  const config = loadCalcConfig()
   if (!p) {
     return {
       nombre: '', categoria: '', notas: '', stock: 0, precio: 0, precioML: 0,
       gramos: 100, horas: 2, minutos: 0, piezas: 1,
       filamentoTipo: 'variable', filMaterial: 'PLA', filColor: '', filMarca: '',
+      precioKg: config.precio_kg, desperdicioPct: config.desperdicio_pct,
       componentes: [], foto_url: null,
     }
   }
@@ -301,6 +307,8 @@ function formFromProducto(p: Producto | null): FormState {
     gramos: p.gramos || 0, horas: p.tiempo_horas || 0, minutos: p.minutos_impresion || 0, piezas: p.cantidad_piezas || 1,
     filamentoTipo: p.filamento_tipo || 'variable',
     filMaterial: p.filamento_material || 'PLA', filColor: p.filamento_color || '', filMarca: p.filamento_marca || '',
+    precioKg: p.precio_kg != null && p.precio_kg > 0 ? p.precio_kg : config.precio_kg,
+    desperdicioPct: p.desperdicio_pct != null ? p.desperdicio_pct : config.desperdicio_pct,
     componentes,
     foto_url: p.foto_url,
   }
@@ -335,7 +343,10 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
 
   const set = <K extends keyof FormState>(key: K, val: FormState[K]) => setForm(f => ({ ...f, [key]: val }))
 
-  const desglose = useMemo(() => costoImpresion(form.gramos, form.horas, form.minutos, config), [form.gramos, form.horas, form.minutos, config])
+  const desglose = useMemo(
+    () => costoImpresion(form.gramos, form.horas, form.minutos, { ...config, precio_kg: form.precioKg, desperdicio_pct: form.desperdicioPct }),
+    [form.gramos, form.horas, form.minutos, form.precioKg, form.desperdicioPct, config]
+  )
   const costoImpresionUnit = form.piezas > 0 ? desglose.total / form.piezas : desglose.total
   const costoComponentes = form.componentes.reduce((s, c) => s + c.cantidad * c.precio_unitario, 0)
   const costoTotal = costoImpresionUnit + costoComponentes
@@ -401,8 +412,8 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
         filamento_material: form.filamentoTipo === 'fijo' ? form.filMaterial : null,
         filamento_color: form.filamentoTipo === 'fijo' ? form.filColor : null,
         filamento_marca: form.filamentoTipo === 'fijo' ? form.filMarca : null,
-        precio_kg: config.precio_kg,
-        desperdicio_pct: config.desperdicio_pct,
+        precio_kg: form.precioKg,
+        desperdicio_pct: form.desperdicioPct,
         precio_kwh: config.precio_kwh,
         consumo_w: config.consumo_w,
         costo_impresora: config.costo_impresora,
@@ -568,6 +579,8 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
                           <strong style={{ color: 'var(--color-accent-purple)' }}>A elección</strong>
                         )}
                       </div>
+                      <div><span style={{ color: 'var(--color-muted)' }}>Precio filamento:</span> <strong style={{ color: 'var(--color-text)' }}>{$$(form.precioKg)}/kg</strong></div>
+                      <div><span style={{ color: 'var(--color-muted)' }}>Desperdicio:</span> <strong style={{ color: 'var(--color-text)' }}>{form.desperdicioPct}%</strong></div>
                     </div>
                   </div>
 
@@ -672,6 +685,12 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
                       </div>
                     )}
 
+                    <label style={S.label}>Costo del material</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 12 }}>
+                      <NumField label="Precio del filamento" value={form.precioKg} onChange={v => set('precioKg', v)} prefix="$" suffix="/kg" step={100} />
+                      <NumField label="Desperdicio / fallas" value={form.desperdicioPct} onChange={v => set('desperdicioPct', v)} suffix="%" />
+                    </div>
+
                     <div style={{ padding: '8px 12px', background: 'var(--color-surface)', borderRadius: 8, fontSize: 12, color: 'var(--color-muted)' }}>
                       Costo de impresión por pieza (bruto): <strong style={{ color: 'var(--color-text)' }}>{$$(costoImpresionUnit)}</strong>
                       <br />
@@ -679,7 +698,7 @@ function ProductoModal({ producto, categorias, catalogo, onClose, onSaved, onDel
                         {desglose.gramosConDesperdicio.toFixed(0)}g · {desglose.tiempoHs.toFixed(1)}hs · filamento {$$(desglose.costoFilamento)} + luz {$$(desglose.costoElectricidad)} + amortización {$$(desglose.costoAmortizacion)}, dividido en {form.piezas} {form.piezas === 1 ? 'pieza' : 'piezas'}.
                       </span>
                       <br />
-                      <span style={{ fontSize: 11 }}>Usa los valores ($/kg, $/kWh, amortización) configurados en la <Link href="/calculadora" style={{ color: 'var(--color-brand)' }}>Calculadora</Link>.</span>
+                      <span style={{ fontSize: 11 }}>El $/kg y el % de desperdicio son propios de este producto (se precargan desde la <Link href="/calculadora" style={{ color: 'var(--color-brand)' }}>Calculadora</Link> al crearlo). Luz y amortización sí usan siempre los valores generales de la Calculadora.</span>
                     </div>
                   </div>
 
