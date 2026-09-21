@@ -156,6 +156,8 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
   const [creandoNombre, setCreandoNombre] = useState<string | null>(null)
   const [precioNuevo, setPrecioNuevo] = useState(0)
   const [packagingNuevo, setPackagingNuevo] = useState(false)
+  const [expCategoria, setExpCategoria] = useState(false)
+  const [expPackaging, setExpPackaging] = useState(false)
 
   function update(id: string, patch: Partial<Componente>) { onChange(componentes.map(c => c.id === id ? { ...c, ...patch } : c)) }
   function remove(id: string) { onChange(componentes.filter(c => c.id !== id)) }
@@ -199,15 +201,38 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
     onCatalogoChanged()
   }
 
+  const busquedaTrim = busqueda.trim()
+
+  // Modo búsqueda (escribiendo texto): lista plana filtrada por nombre + categoría.
   const sugeridos = catalogo.filter(item => {
-    const matchTexto = !busqueda || item.nombre.toLowerCase().includes(busqueda.toLowerCase())
+    const matchTexto = !busquedaTrim || item.nombre.toLowerCase().includes(busquedaTrim.toLowerCase())
     const matchCategoria = item.es_packaging || item.categorias.length === 0 || (!!categoriaActual && item.categorias.includes(categoriaActual))
     return matchTexto && matchCategoria
-  }).slice(0, 8)
-  const yaExiste = catalogo.some(item => item.nombre.trim().toLowerCase() === busqueda.trim().toLowerCase())
+  }).slice(0, 20)
+
+  // Modo navegación (sin texto): agrupado por categoría / packaging y
+  // colapsable, para poder ver todo el catálogo disponible sin tener que
+  // acordarse el nombre exacto de cada componente.
+  const deCategoria = categoriaActual
+    ? catalogo.filter(item => !item.es_packaging && item.categorias.includes(categoriaActual))
+    : []
+  const packagingYGenerales = catalogo.filter(item => item.es_packaging || item.categorias.length === 0)
+
+  const yaExiste = catalogo.some(item => item.nombre.trim().toLowerCase() === busquedaTrim.toLowerCase())
   const nombresCatalogo = new Set(catalogo.map(c => c.nombre.trim().toLowerCase()))
 
   const total = componentes.reduce((s, c) => s + c.cantidad * c.precio_unitario, 0)
+
+  const groupHeaderStyle: React.CSSProperties = {
+    display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px',
+    background: 'var(--color-surface-2)', border: 'none', borderBottom: '1px solid var(--color-border)',
+    color: 'var(--color-text)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const,
+  }
+  const itemBtnStyle: React.CSSProperties = {
+    display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px 8px 24px',
+    background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)',
+    fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const,
+  }
 
   return (
     <div>
@@ -246,22 +271,63 @@ function ComponentesSection({ componentes, onChange, catalogo, categoriaActual, 
                   Es packaging (caja, cinta, etc.) — aparece siempre, en cualquier categoría
                 </label>
               </div>
-            ) : (
+            ) : busquedaTrim ? (
               <>
                 {sugeridos.map(item => (
                   <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={{ display: 'flex', justifyContent: 'space-between', width: '100%', padding: '8px 12px', background: 'none', border: 'none', borderBottom: '1px solid var(--color-border)', color: 'var(--color-text)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const }}>
                     <span>{item.es_packaging && '📦 '}{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
                   </button>
                 ))}
-                {busqueda.trim() && !yaExiste && (
+                {!yaExiste && (
                   <button onClick={iniciarCreacion} style={{ display: 'block', width: '100%', padding: '8px 12px', background: 'none', border: 'none', color: 'var(--color-brand)', fontSize: 13, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' as const, fontWeight: 600 }}>
-                    + Crear "{busqueda.trim()}" en el catálogo
+                    + Crear "{busquedaTrim}" en el catálogo
                   </button>
                 )}
-                {sugeridos.length === 0 && !busqueda.trim() && (
-                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>
-                    {catalogo.length === 0 ? 'El catálogo está vacío — escribí un nombre para crear el primero.' : 'Escribí para buscar o crear un componente.'}
+                {sugeridos.length === 0 && (
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>No se encontraron componentes con "{busquedaTrim}".</div>
+                )}
+                <button onClick={() => setBuscando(false)} style={{ display: 'block', width: '100%', padding: '6px 12px', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const }}>Cerrar</button>
+              </>
+            ) : (
+              <>
+                {categoriaActual && (
+                  <div>
+                    <button onClick={() => setExpCategoria(v => !v)} style={groupHeaderStyle}>
+                      <span>{expCategoria ? '▾' : '▸'} {categoriaActual}</span>
+                      <span style={{ color: 'var(--color-muted)' }}>{deCategoria.length}</span>
+                    </button>
+                    {expCategoria && (
+                      deCategoria.length === 0 ? (
+                        <div style={{ padding: '6px 12px 10px 24px', fontSize: 12, color: 'var(--color-muted)' }}>Todavía no hay componentes para "{categoriaActual}".</div>
+                      ) : (
+                        deCategoria.map(item => (
+                          <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={itemBtnStyle}>
+                            <span>{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
+                          </button>
+                        ))
+                      )
+                    )}
                   </div>
+                )}
+                <div>
+                  <button onClick={() => setExpPackaging(v => !v)} style={groupHeaderStyle}>
+                    <span>{expPackaging ? '▾' : '▸'} 📦 Packaging y generales</span>
+                    <span style={{ color: 'var(--color-muted)' }}>{packagingYGenerales.length}</span>
+                  </button>
+                  {expPackaging && (
+                    packagingYGenerales.length === 0 ? (
+                      <div style={{ padding: '6px 12px 10px 24px', fontSize: 12, color: 'var(--color-muted)' }}>Todavía no cargaste componentes de packaging.</div>
+                    ) : (
+                      packagingYGenerales.map(item => (
+                        <button key={item.id} onClick={() => agregarFila(item.nombre, item.precio_unitario)} style={itemBtnStyle}>
+                          <span>{item.es_packaging && '📦 '}{item.nombre}</span><span style={{ color: 'var(--color-muted)' }}>{$$(item.precio_unitario)}</span>
+                        </button>
+                      ))
+                    )
+                  )}
+                </div>
+                {catalogo.length === 0 && (
+                  <div style={{ padding: '8px 12px', fontSize: 12, color: 'var(--color-muted)' }}>El catálogo está vacío — escribí un nombre para crear el primero.</div>
                 )}
                 <button onClick={() => setBuscando(false)} style={{ display: 'block', width: '100%', padding: '6px 12px', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-muted)', fontSize: 11, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'center' as const }}>Cerrar</button>
               </>
